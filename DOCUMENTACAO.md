@@ -1,4 +1,4 @@
-# Documentação técnica — O Gato Preto Café (V4.1)
+# Documentação técnica — O Gato Preto Café (V4.1.1)
 
 [Voltar ao README](README.md)
 
@@ -168,3 +168,29 @@ No login, a área promocional é reduzida à marca em telas de até 760 px, as c
 | Link de registro indisponível | Mensagem contextual e retorno à consulta aprovados. |
 
 Os testes foram realizados com Chromium e inserção direta dos arquivos no documento. A navegação HTTP/HTTPS foi bloqueada pelo ambiente. Os parâmetros de navegação, a limpeza da URL, a mudança de página após login e o armazenamento foram simulados; por isso não constituem uma validação de ponta a ponta em hospedagem real. Permanecem pendentes a publicação no GitHub Pages, a persistência entre páginas e versões em navegador real, o teclado virtual de um smartphone físico, outros navegadores, impressão/PDF e downloads. Os PDFs de modelagem não acompanham o ZIP de origem. A autenticação segue demonstrativa, sem segurança de produção.
+
+
+## V4.1.1 — Correção de responsividade e refinamento mobile
+
+### Diagnóstico estrutural e implementação
+
+Na V4.1, a marca estava na barra lateral e os controles do topo em um cabeçalho com posicionamento absoluto, limitado a parte da largura da tela. Regras legadas de largura, Flexbox e quebra de texto competiam com os estilos mobile. Os indicadores também herdavam regras de Flexbox de largura mínima; nem todos os grupos estavam cobertos pela grade móvel da V4.
+
+A atualização introduz uma marca mobile dentro do próprio cabeçalho, em fluxo normal, com três controles independentes de 44 × 44 px. O menu da conta é ancorado à direita, com fechamento por clique externo e Escape, altura limitada pela área útil, identificação do usuário e controles existentes. A opção de tela cheia é omitida em mobile quando a API não está disponível; quando disponível, usa a tela cheia nativa sem ocultar a barra inferior. A experiência de apresentação em tela cheia desktop continua disponível. A disponibilidade efetiva da API depende do navegador e suas permissões.
+
+As grades de indicadores abrangem o dashboard, os resumos e os painéis analíticos dos módulos, com duas colunas em telas de 301 a 760 px e uma coluna em larguras menores. O cabeçalho mantém o menu de conta compacto até 1100 px; acima de 760 px, inclusive em orientação horizontal, a navegação lateral desktop é mantida. A navegação inferior possui altura reservada no conteúdo, compensação de `safe-area-inset-*` e ajuste para telas baixas. Ações, modais, filtros e células receberam limites de dimensionamento, sem bloquear a rolagem da página para esconder problemas.
+
+### Arquivos e compatibilidade
+
+| Arquivo | Alteração |
+| --- | --- |
+| `css/v4.css` | Substituição de regras conflitantes do cabeçalho e consolidação dos estilos responsivos, indicadores, menus e componentes. |
+| `js/global.js` | Marca no cabeçalho mobile, ícones, menu da conta, verificação de tela cheia e contador acessível limitado visualmente a 99+. |
+| `README.md`, `DOCUMENTACAO.md` | Histórico e descrição da versão corretiva. |
+| `TESTES_V4.1.1.md` | Relatório de validação e limitações. |
+
+Os demais 15 arquivos originais permanecem idênticos byte a byte, inclusive `js/dados.js`, os módulos operacionais, login, CSS base e páginas HTML. A chave `gato-preto-cafe-v1` continua inalterada. Nenhuma dependência foi adicionada. Não há migração ou restauração automática de dados introduzida por esta atualização.
+
+### Validação
+
+A matriz de 13 dimensões e dois temas compreendeu 702 combinações de telas e funcionalidades, 130 verificações de cabeçalho, 120 menus da conta, 80 barras de navegação, 52 modais e 26 layouts de login. Também foram repetidos 21 cenários de deep linking e verificações de operações, permissões e tema. Não foram capturadas exceções JavaScript nem falhas nas asserções da matriz. Consulte [TESTES_V4.1.1.md](TESTES_V4.1.1.md) para metodologia, resultados e limitações. O ambiente bloqueia navegação HTTP/file; a validação foi feita com Chromium offline e simulação de armazenamento e parâmetros. A captura do problema citada no pedido não foi anexada ao ZIP nem disponibilizada nesta atualização; o diagnóstico foi realizado diretamente sobre os arquivos.

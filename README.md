@@ -2,7 +2,7 @@
 
 **Projeto Integrador (PI) | Análise e Desenvolvimento de Sistemas | FATEC Guaratinguetá**
 
-![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=flat-square&logo=html5&logoColor=white) ![CSS3](https://img.shields.io/badge/CSS3-1572B6?style=flat-square&logo=css3&logoColor=white) ![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=flat-square&logo=javascript&logoColor=black) ![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-222222?style=flat-square&logo=github&logoColor=white) ![Versão](https://img.shields.io/badge/Prot%C3%B3tipo-V4.1-1764b5?style=flat-square)
+![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=flat-square&logo=html5&logoColor=white) ![CSS3](https://img.shields.io/badge/CSS3-1572B6?style=flat-square&logo=css3&logoColor=white) ![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=flat-square&logo=javascript&logoColor=black) ![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-222222?style=flat-square&logo=github&logoColor=white) ![Versão](https://img.shields.io/badge/Prot%C3%B3tipo-V4.1.1-1764b5?style=flat-square)
 
 Sistema web interno desenvolvido para demonstrar a centralização das atividades de gestão do O Gato Preto Café, com módulos de pedidos, estoque, financeiro e administração.
 
@@ -207,12 +207,13 @@ A rastreabilidade contempla os 21 casos de uso dos módulos de pedidos, estoque,
 | V3 | Gráficos interativos, pesquisa global, notificações, ordenação, paginação, menu recolhível e ajustes visuais. |
 | V4 | Redesign adaptativo: interface azul mais limpa, navegação inferior mobile, ações priorizadas e informações detalhadas sob demanda. |
 | V4.1 | Notificações contextuais, filtros automáticos, destaque de registros e login mobile compacto. |
+| V4.1.1 | Correção do cabeçalho mobile, menu da conta, indicadores compactos, áreas de segurança e responsividade. |
 
 A V2 introduz filtros de período independentes, ações rápidas na consulta de pedidos, aprimoramentos de responsividade, modo de tela cheia e uma base fictícia de demonstração ampliada.
 
 Os dados previamente armazenados podem ser mantidos quando a origem do site permanece a mesma. A opção de restaurar os dados de demonstração substitui os registros locais.
 
-## Interface V4 e V4.1
+## Interface V4, V4.1 e V4.1.1
 
 - Desktop: menu lateral recolhível, cabeçalho compacto, quatro indicadores prioritários (conforme permissões) e painéis analíticos expansíveis.
 - Mobile: navegação inferior, menu da conta compacto, seletor de funcionalidades e registros expansíveis.
@@ -226,6 +227,14 @@ Os dados previamente armazenados podem ser mantidos quando a origem do site perm
 - O login mobile concentra marca, formulário e aviso acadêmico na área útil da tela. Abra **Acesso de demonstração** para escolher um perfil ou restaurar os dados. A rolagem continua disponível em telas excepcionalmente baixas, com teclado aberto ou com informações adicionais expandidas.
 - Nenhuma alteração na chave, no formato de dados ou nas regras de autenticação simulada.
 
+### Novidades da V4.1.1
+
+- Cabeçalho mobile unificado no fluxo da página: marca à esquerda, busca, notificações e menu à direita. O perfil, o cargo, o tema, a tela cheia (quando suportada) e a saída ficam no menu da conta.
+- Indicadores em duas colunas nas larguras mobile usuais; uma coluna abaixo de 301 px. A barra inferior preserva o módulo ativo e reserva espaço para conteúdo e áreas de segurança.
+- Menu da conta também recolhível em telas intermediárias até 1100 px, sem alterar a navegação lateral desktop. Em orientação horizontal acima de 760 px, permanece o layout de tablet/desktop.
+- Melhorias nos formulários, filtros, tabelas, modais e controles de toque. Login compacto e navegação contextual da V4.1 preservados.
+- Nenhuma mudança nas regras de negócio, nas credenciais demonstrativas ou na chave e no formato dos dados locais.
+
 ## Testes e validação
 
 Conforme o registro técnico da V2, foram realizadas verificações de sintaxe JavaScript, referências entre páginas, controles operacionais e comportamento visual em diferentes larguras de tela. Também foi inspecionado um PDF de fluxo de caixa.
@@ -236,7 +245,9 @@ A V4 foi verificada em Chromium com carregamento offline dos arquivos e armazena
 
 A V4.1 foi verificada no Chromium offline em seis dimensões de tela: 162 combinações de telas e funcionalidades, 42 cenários de destino contextual e seis layouts de login. Nenhum erro JavaScript foi capturado nos testes. A navegação HTTP foi bloqueada pelo ambiente; foram simulados os parâmetros de URL, a limpeza da URL, o redirecionamento do login e o armazenamento. A validação em publicação real e com teclado virtual físico permanece pendente.
 
-Consulte o detalhamento em [DOCUMENTACAO.md](DOCUMENTACAO.md).
+A V4.1.1 foi verificada em 13 dimensões de tela, nos dois temas, com 702 combinações de telas e funcionalidades, 130 verificações do cabeçalho, 120 cenários de menu da conta, 80 verificações de navegação inferior, 52 aberturas de modais de busca/notificações e 26 layouts de login. Foram repetidos 21 cenários de navegação contextual e testes de operações. Não foram capturadas exceções JavaScript nem rolagem horizontal indevida da página na matriz. As verificações foram offline, com armazenamento e parâmetros de URL simulados; a publicação real permanece pendente.
+
+Consulte o detalhamento em [DOCUMENTACAO.md](DOCUMENTACAO.md) e no [relatório de testes V4.1.1](TESTES_V4.1.1.md).
 
 ## Limitações e melhorias futuras
 
