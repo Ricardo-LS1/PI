@@ -2,9 +2,9 @@
 
 **Projeto Integrador (PI) | Análise e Desenvolvimento de Sistemas | FATEC Guaratinguetá**
 
-![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=flat-square&logo=html5&logoColor=white) ![CSS3](https://img.shields.io/badge/CSS3-1572B6?style=flat-square&logo=css3&logoColor=white) ![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=flat-square&logo=javascript&logoColor=black) ![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-222222?style=flat-square&logo=github&logoColor=white) ![Versão](https://img.shields.io/badge/Prot%C3%B3tipo-V2-795548?style=flat-square)
+![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=flat-square&logo=html5&logoColor=white) ![CSS3](https://img.shields.io/badge/CSS3-1572B6?style=flat-square&logo=css3&logoColor=white) ![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=flat-square&logo=javascript&logoColor=black) ![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-222222?style=flat-square&logo=github&logoColor=white) ![Versão](https://img.shields.io/badge/Prot%C3%B3tipo-V3-2563EB?style=flat-square)
 
-Sistema web interno desenvolvido para demonstrar a centralização das atividades de gestão do O Gato Preto Café, com módulos de pedidos, estoque, financeiro e administração.
+Protótipo web de um sistema de gestão interno para proprietários e gerentes do O Gato Preto Café, com integração entre pedidos, estoque, financeiro e administração, além de painéis gerenciais interativos.
 
 **[Acessar o protótipo online](https://ricardo-ls1.github.io/PI/)** · **[Documentação técnica](DOCUMENTACAO.md)**
 
@@ -22,6 +22,7 @@ Sistema web interno desenvolvido para demonstrar a centralização das atividade
 - [Estrutura do projeto](#estrutura-do-projeto)
 - [Execução local](#execução-local)
 - [Relatórios gerenciais](#relatórios-gerenciais)
+- [Backup e recuperação](#backup-e-recuperação)
 - [Modelagem e documentação](#modelagem-e-documentação)
 - [Evolução do protótipo](#evolução-do-protótipo)
 - [Testes e validação](#testes-e-validação)
@@ -44,7 +45,7 @@ O projeto busca atender à necessidade de organizar os registros de pedidos, aco
 
 A solução consiste em um protótipo navegável de um sistema de gestão web de uso interno, destinado aos proprietários e gerentes. A interface reúne operações administrativas e gerenciais em um único ambiente, com indicadores, filtros, históricos e relatórios.
 
-A versão atual simula os processos de negócio no próprio navegador, permitindo avaliar a organização das funcionalidades e a experiência de uso antes de uma eventual implementação com servidor e banco de dados.
+Na V3, a conclusão de um pedido com pagamento confirmado integra automaticamente a baixa de estoque e o registro de recebimento. A solução simula os processos de negócio no próprio navegador, permitindo avaliar a organização das funcionalidades e a experiência de uso antes de uma eventual implementação com servidor e banco de dados.
 
 ## Objetivos
 
@@ -56,58 +57,43 @@ Propor um sistema de gestão que centralize as informações operacionais e fina
 
 - Organizar o registro e o acompanhamento dos pedidos.
 - Facilitar o controle de produtos e das movimentações de estoque.
-- Registrar recebimentos, despesas e consultar o fluxo de caixa.
+- Automatizar as movimentações de estoque e os recebimentos associados à conclusão de pedidos.
+- Registrar receitas, despesas, quitações e estornos, acompanhando o fluxo de caixa.
 - Apresentar informações gerenciais por meio de indicadores e gráficos.
 - Diferenciar os perfis de acesso de administrador e gerente.
 - Representar, em uma interface navegável, os requisitos identificados na modelagem do projeto.
 
 ## Funcionalidades
 
-### Dashboard gerencial
+| Área | Principais recursos |
+| --- | --- |
+| Dashboard gerencial | Painel geral e painéis por módulo; indicadores comparativos; filtros rápidos; gráficos interativos de pizza, rosca, linha, área e barras; tela cheia. |
+| Pedidos | Cadastro, consulta, edição em andamento, ações rápidas, confirmação de pagamento, conclusão integrada, cancelamento e histórico. |
+| Estoque | Cadastro, edição e inativação de produtos; entradas, saídas e ajustes manuais; baixa automática nas vendas; alertas de estoque baixo e histórico. |
+| Financeiro | Recebimentos manuais e automáticos, despesas, quitação, estornos parciais ou integrais, fluxo de caixa, históricos e relatórios PDF/CSV. |
+| Administração | Usuários, permissões por módulo, configurações do café, backup e restauração em JSON, histórico de atividades. |
+| Funcionalidades transversais | Dashboards, notificações com marcação de leitura e pesquisa global conforme os acessos autorizados. |
 
-- Painel inicial de acompanhamento das operações.
-- Dashboards específicos nos módulos de pedidos, estoque e financeiro.
-- Indicadores calculados a partir dos registros locais, com filtros de período.
-- Gráficos de pizza, rosca, linhas, área e barras horizontais e verticais.
-- Exibição em tela cheia para acompanhamento gerencial e apresentações.
+A interface utiliza azul-claro em degradê, tema escuro persistente, tela de login reformulada, menu recolhível, campos de data em formato brasileiro, tabelas com ordenação e paginação nas consultas e layout adaptável a diferentes tamanhos de tela.
 
-### Gestão de pedidos
+### Integração operacional
 
-- Registro de pedidos com seleção de produtos, quantidades e cálculo de valores.
-- Verificação de disponibilidade dos produtos no momento do registro.
-- Consulta por número, data e situação do pedido.
-- Atualização de status, finalização e cancelamento com justificativa.
-- Histórico de registros e alterações.
+```mermaid
+flowchart LR
+    A[Pedido em andamento] --> B{Estoque suficiente e pagamento confirmado?}
+    B -- Não --> C[Manter em andamento]
+    B -- Sim --> D[Consolidar venda]
+    D --> E[Pedido concluído]
+    D --> F[Baixa no estoque]
+    D --> G[Recebimento financeiro]
+    E --> H[Indicadores e históricos]
+    F --> H
+    G --> H
+```
 
-O fluxo de situação contempla pedidos pendentes, em preparo, prontos, concluídos e cancelados. As transições adotadas são propostas para a demonstração.
+A finalização valida a disponibilidade e evita lançamentos duplicados. As alterações são persistidas em conjunto no navegador. Cancelamentos podem gerar estornos e reposição de estoque, quando cabível, sem eliminar o histórico. Os lançamentos manuais continuam disponíveis.
 
-### Gestão de estoque
-
-- Cadastro e consulta de produtos, categorias, unidades e preços.
-- Registro de entradas e saídas com atualização dos saldos.
-- Ajustes de estoque mediante justificativa.
-- Histórico das movimentações.
-- Identificação de produtos com quantidade abaixo do estoque mínimo.
-
-### Gestão financeira
-
-- Registro de recebimentos e despesas.
-- Associação opcional de recebimentos a pedidos.
-- Consulta de receitas e despesas com filtros.
-- Controle de despesas pagas e pendentes.
-- Acompanhamento do fluxo de caixa e do histórico financeiro.
-- Geração de relatórios e exportação CSV.
-
-### Administração
-
-- Cadastro, edição, ativação e inativação de usuários.
-- Definição de perfis e permissões individuais por módulo.
-- Configuração de informações do estabelecimento e formas de pagamento.
-- Restauração da base de dados fictícia para demonstração.
-
-### Interface e usabilidade
-
-A interface dispõe de menu recolhível, tema claro e escuro, adaptação a diferentes dimensões de tela e validação de campos de data. A preferência de tema é mantida no navegador.
+As regras detalhadas estão na [documentação técnica](DOCUMENTACAO.md#regras-de-negócio).
 
 ## Perfis de acesso
 
@@ -119,7 +105,7 @@ A interface dispõe de menu recolhível, tema claro e escuro, adaptação a dife
 | Financeiro | Sim | Sim |
 | Administração | Sim | Não |
 
-A tabela representa os acessos padrão. Um administrador pode personalizar o acesso aos módulos operacionais por conta. O dashboard e o menu respeitam as permissões simuladas.
+A tabela representa os acessos padrão. Um administrador pode personalizar o acesso aos módulos operacionais por conta. O dashboard, o menu, as notificações e a pesquisa global respeitam as permissões simuladas. As rotinas internas de integração de um pedido autorizado não concedem acesso à interface dos demais módulos.
 
 ### Credenciais de demonstração
 
@@ -138,7 +124,7 @@ As credenciais são públicas e fictícias. O controle de acesso é executado no
 | CSS3 | Estilização, responsividade e temas |
 | JavaScript | Lógica de negócio simulada, validações e interatividade |
 | LocalStorage | Persistência de dados e preferências no navegador |
-| SVG e CSS | Representação visual dos gráficos |
+| SVG e CSS | Gráficos interativos e recursos visuais |
 | Git e GitHub | Versionamento e organização do código |
 | GitHub Pages | Publicação estática do protótipo |
 
@@ -148,21 +134,31 @@ O projeto utiliza tecnologias nativas do navegador, sem dependências externas d
 
 ```text
 PI/
-├── assets/          # Recursos visuais
-├── css/             # Estilos da interface
-├── js/              # Lógica e comportamento do sistema
-├── pages/           # Páginas internas
-│   ├── administracao.html
+├── index.html
+├── pages/
 │   ├── dashboard.html
+│   ├── pedidos.html
 │   ├── estoque.html
 │   ├── financeiro.html
-│   └── pedidos.html
-├── index.html       # Entrada do sistema
-├── DOCUMENTACAO.md  # Rastreabilidade e regras de demonstração
-└── README.md        # Apresentação do projeto
+│   └── administracao.html
+├── css/
+│   └── style.css
+├── js/
+│   ├── global.js
+│   ├── dados.js
+│   ├── login.js
+│   ├── dashboard.js
+│   ├── pedidos.js
+│   ├── estoque.js
+│   ├── financeiro.js
+│   └── administracao.js
+├── assets/
+│   └── logo.svg
+├── DOCUMENTACAO.md
+└── README.md
 ```
 
-A aplicação funciona como um conjunto de páginas estáticas. A lógica de manipulação dos registros e as preferências são executadas no navegador; não existe uma API de back-end nem um banco de dados centralizado nesta versão.
+A aplicação funciona como um conjunto de páginas estáticas. A lógica de manipulação dos registros e as preferências são executadas no navegador; não existe uma API de back-end nem um banco de dados centralizado nesta versão. O repositório inclui um arquivo adicional de documentação técnica, separado do README.
 
 ## Execução local
 
@@ -183,57 +179,76 @@ python3 -m http.server 8000
 
 Acesse [http://localhost:8000/](http://localhost:8000/) e utilize uma das contas de demonstração. O Python é necessário apenas para esse método de execução local, não para utilizar o sistema publicado.
 
+Para publicar uma atualização, envie os arquivos do protótipo à raiz do repositório e mantenha a origem do site. Em **Settings → Pages**, configure a publicação pela branch `main`, pasta `/ (root)`, caso ainda não esteja configurada. Não é necessário servidor de aplicação.
+
 ## Relatórios gerenciais
 
 No módulo Financeiro, a área **Relatórios financeiros** permite selecionar o tipo de relatório e o período desejado. Os registros podem ser exportados em CSV ou apresentados em um documento para impressão.
 
 Para gerar um PDF, selecione **Imprimir / salvar PDF** e escolha a opção de salvar como PDF na janela do navegador, preferencialmente em papel A4. O documento inclui informações consolidadas, indicadores, gráfico e tabelas. A paginação depende das configurações do navegador.
 
+## Backup e recuperação
+
+No módulo **Administração**, acesse **Backup e restauração** para exportar os registros em JSON ou importar uma cópia existente. A importação valida a estrutura do arquivo e exige confirmação antes de substituir a base local; após a restauração, será necessário entrar novamente.
+
+A opção **Restaurar dados de demonstração** substitui os registros do navegador pelos dados fictícios iniciais. Exporte um backup antes de executar essa ação ou limpar os dados do navegador. Os backups podem conter credenciais demonstrativas; não utilize nem compartilhe dados reais.
+
 ## Modelagem e documentação
 
 O desenvolvimento do protótipo tem como referência os materiais acadêmicos produzidos pelo grupo:
 
-- **Diagrama Gato Preto Café Revisado:** modelagem dos atores, casos de uso e operações associadas.
-- **Sistema de Gestão do O Gato Preto Café:** apresentação do contexto empresarial e da proposta de solução.
+- **Diagrama Gato Preto Café Revisado (5 páginas):** modelagem original com 21 casos de uso.
+- **Diagrama Gato Preto Café V3 (7 páginas):** ampliação funcional e relacionamentos entre os módulos.
+- **Sistema de Gestão do O Gato Preto Café (6 páginas):** contextualização empresarial e proposta de solução.
 
-A rastreabilidade contempla os 21 casos de uso dos módulos de pedidos, estoque, financeiro e administração. A correspondência entre esses casos de uso e os controles do protótipo, além das regras de negócio propostas e dos registros de testes, está descrita na [documentação técnica](DOCUMENTACAO.md).
+A modelagem V3 contempla **2 atores, 4 módulos, 30 casos de uso, 66 subfunções e 132 operações internas**. Dois casos de uso transversais abrangem dashboards e notificações.
+
+| Área | Casos de uso | Subfunções | Operações |
+| --- | ---: | ---: | ---: |
+| Pedidos | 7 | 17 | 34 |
+| Estoque | 7 | 15 | 30 |
+| Financeiro | 9 | 19 | 38 |
+| Administração | 5 | 11 | 22 |
+| Transversais | 2 | 4 | 8 |
+| **Total** | **30** | **66** | **132** |
+
+A [documentação técnica](DOCUMENTACAO.md) apresenta a matriz de rastreabilidade, as regras de negócio, a arquitetura e os testes registrados. A proposta permanece sujeita à validação com a empresa.
 
 ## Evolução do protótipo
 
 | Versão | Descrição |
 | --- | --- |
-| V1 | Primeira versão do protótipo, utilizada como base para a evolução da interface e das funcionalidades. |
-| V2 | Ampliação dos dashboards, visualizações gráficas, relatórios, permissões por conta e recursos de usabilidade. |
+| V1 | Primeira versão navegável, com os quatro módulos, cadastros, consultas e dados fictícios. |
+| V2 | Ampliação dos dashboards, gráficos, relatórios, permissões individuais, filtros e responsividade. |
+| **V3 (atual)** | Integração automática das vendas, edição de pedidos e produtos, estornos, quitação de despesas, backup JSON, histórico de atividades, notificações, gráficos interativos e refinamento da interface. |
 
-A V2 introduz filtros de período independentes, ações rápidas na consulta de pedidos, aprimoramentos de responsividade, modo de tela cheia e uma base fictícia de demonstração ampliada.
-
-Os dados previamente armazenados podem ser mantidos quando a origem do site permanece a mesma. A opção de restaurar os dados de demonstração substitui os registros locais.
+A V3 mantém a chave de armazenamento local da versão anterior. Os registros existentes são preservados na mesma origem e navegador, com adaptação dos campos novos; vendas antigas não geram movimentações retroativas. Exporte um backup antes de restaurar ou substituir a base local.
 
 ## Testes e validação
 
-Conforme o registro técnico da V2, foram realizadas verificações de sintaxe JavaScript, referências entre páginas, controles operacionais e comportamento visual em diferentes larguras de tela. Também foi inspecionado um PDF de fluxo de caixa.
+Conforme os registros técnicos da V3, foram realizados testes de sintaxe, finalização integrada, prevenção de duplicidade, estoque insuficiente, cancelamento, estornos, quitação, edição, permissões, backup, gráficos e migração. As seis páginas foram verificadas em nove resoluções, de 320 × 568 a 3840 × 2160, quanto ao transbordamento horizontal nos estados iniciais. Um relatório de fluxo de caixa A4 de duas páginas foi inspecionado visualmente.
 
-Essas verificações ocorreram em ambiente controlado, com armazenamento simulado. A validação completa em hospedagem real, incluindo persistência entre páginas, exportação CSV e compatibilidade com dispositivos físicos, ainda precisa ser concluída.
+As verificações de interface ocorreram em Chromium, com carregamento direto e armazenamento simulado devido às restrições do ambiente original. Não equivalem à homologação da versão publicada, à inspeção de todos os estados de interface ou à validação em Smart TVs físicas.
 
-Consulte o detalhamento em [DOCUMENTACAO.md](DOCUMENTACAO.md).
+Consulte os cenários, resultados registrados e limitações em [DOCUMENTACAO.md](DOCUMENTACAO.md).
 
 ## Limitações e melhorias futuras
 
 ### Limitações atuais
 
-- Dados armazenados exclusivamente no navegador, sem sincronização entre dispositivos.
-- Autenticação e autorização simuladas, sem proteção de produção.
-- Movimentações de estoque e recebimentos registrados manualmente, sem baixa automática a partir dos pedidos.
-- Ausência de integração automática com WhatsApp e Excel.
-- Regras operacionais de demonstração ainda sujeitas à validação com a empresa.
+- Dados locais, sem sincronização entre dispositivos ou garantia de concorrência entre abas.
+- Autenticação, permissões e pagamentos simulados, sem proteção de produção ou processamento real de pagamentos.
+- Baixa por unidade de produto vendido, sem fichas técnicas de ingredientes ou controle de validade.
+- Ausência de integração automática com WhatsApp, Excel e serviços financeiros.
+- Relatórios PDF dependem da impressão do navegador; compatibilidade com Smart TVs depende do aparelho.
+- Regras de negócio sujeitas à validação com a empresa.
 
 ### Possíveis melhorias
 
-- Implementação de back-end e banco de dados centralizado.
-- Autenticação segura e autorização no servidor.
-- Automatização dos vínculos entre pedidos, estoque e financeiro, conforme requisitos validados.
-- Auditoria de operações, backups e testes automatizados.
-- Validação de usabilidade com os usuários da empresa e em diferentes dispositivos.
+- Implementação de back-end, banco de dados centralizado e autenticação segura.
+- Transações concorrentes, auditoria protegida e políticas de backup no servidor.
+- Testes automatizados de regressão e validação de acessibilidade e usabilidade com os usuários do estabelecimento.
+- Eventual integração com canais de pedidos, meios de pagamento ou controle de insumos, mediante novo levantamento de requisitos.
 
 Esses itens representam possibilidades de evolução, não funcionalidades já implementadas ou compromissos de entrega.
 
