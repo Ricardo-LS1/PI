@@ -1,0 +1,22 @@
+/* Dados de demonstração. Nenhuma informação real ou servidor é utilizado. */
+const Dados = (() => {
+  const chave = 'gato-preto-cafe-v1';
+  const dia = (deslocamento=0) => { const d=new Date();d.setDate(d.getDate()+deslocamento);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+  const agora = () => new Date().toISOString();
+  const id = () => globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const inicial = () => {
+    const produtos=[['p1','Café espresso','Bebidas','un',7,42,10,'Café servido em xícara'],['p2','Cappuccino','Bebidas','un',14,30,8,'Café com leite e espuma'],['p3','Pão de queijo','Salgados','un',6,24,10,'Porção individual'],['p4','Bolo de chocolate','Doces','fatia',12,5,8,'Fatia de bolo'],['p5','Chocolate quente','Bebidas','un',16,18,5,'Bebida quente'],['p6','Brownie','Doces','un',10,4,6,'Brownie individual'],['p7','Croissant','Salgados','un',11,16,5,'Croissant tradicional']].map(([id,nome,categoria,unidade,preco,saldo,minimo,descricao])=>({id,nome,categoria,unidade,preco,saldo,minimo,descricao}));
+    const criar=(numero,items,status,offset)=>{const data=dia(offset);const itens=items.map(([pid,qtd])=>{const p=produtos.find(x=>x.id===pid);return {produtoId:pid,nome:p.nome,preco:p.preco,qtd};});return {id:`o${numero}`,numero,itens,total:itens.reduce((s,i)=>s+i.preco*i.qtd,0),status,data,eventos:[{data:data+'T10:00:00',texto:'Pedido registrado' },...(status==='Pendente'?[]:[{data:data+'T10:20:00',texto:'Status: '+status}])]};};
+    const pedidos=[criar(1001,[['p1',2],['p3',2]],'Concluído',-1),criar(1002,[['p2',2],['p4',1]],'Concluído',0),criar(1003,[['p5',1],['p6',2]],'Em preparo',0),criar(1004,[['p1',1],['p7',2]],'Pendente',0)];
+    const receitas=[{id:'r1',pedidoId:'o1001',descricao:'Pedido #1001',forma:'Pix',valor:26,data:dia(-1),registro:dia(-1)+'T11:00:00'},{id:'r2',pedidoId:'o1002',descricao:'Pedido #1002',forma:'Cartão',valor:40,data:dia(),registro:dia()+'T11:30:00'},{id:'r3',pedidoId:'',descricao:'Vendas anteriores',forma:'Dinheiro',valor:180,data:dia(-2),registro:dia(-2)+'T17:00:00'}];
+    const despesas=[{id:'d1',descricao:'Reposição de produtos',categoria:'Fornecedores',valor:95,data:dia(-2),situacao:'Pago',registro:dia(-2)+'T09:00:00'},{id:'d2',descricao:'Material de limpeza',categoria:'Operacional',valor:32,data:dia(),situacao:'Pago',registro:dia()+'T09:00:00'},{id:'d3',descricao:'Manutenção',categoria:'Manutenção',valor:80,data:dia(),situacao:'Pendente',registro:dia()+'T09:30:00'}];
+    // Histórico ilustrativo adicional da V2, sem modificar os registros já existentes de uma instalação V1.
+    for(let i=0;i<6;i++){const off=-3-i, n=1010+i, pedido=criar(n,[[`p${1+i%7}`,2+i%3],[i%7===2?'p4':'p3',1+i%2]],'Concluído',off);pedidos.push(pedido);receitas.push({id:`rv2-${i}`,pedidoId:pedido.id,descricao:`Pedido #${n}`,forma:['Pix','Cartão','Dinheiro'][i%3],valor:pedido.total,data:dia(off),registro:dia(off)+'T15:00:00'});despesas.push({id:`dv2-${i}`,descricao:['Reposição de insumos','Material de limpeza','Embalagens'][i%3],categoria:['Fornecedores','Operacional','Operacional'][i%3],valor:[28,12,19,25,15,10][i],data:dia(off),situacao:'Pago',registro:dia(off)+'T09:00:00'});}
+    return {produtos,pedidos,receitas,despesas,movimentos:[{id:'m1',produtoId:'p1',nome:'Café espresso',tipo:'Entrada',quantidade:12,anterior:30,novo:42,data:dia(-1),motivo:'Reposição inicial'}],usuarios:[{id:'u1',nome:'Proprietário',login:'admin',senha:'admin123',perfil:'Administrador',ativo:true,permissoes:{pedidos:true,estoque:true,financeiro:true}},{id:'u2',nome:'Gerente',login:'gerente',senha:'gerente123',perfil:'Gerente',ativo:true,permissoes:{pedidos:true,estoque:true,financeiro:true}}],config:{nome:'O Gato Preto Café',endereco:'R. Noel Lourenço de Lima, 12 - Parque do Sol, Guaratinguetá - SP',formas:['Pix','Dinheiro','Cartão'],moeda:'BRL',observacao:'Protótipo acadêmico'}};
+  };
+  const salvar = dados => localStorage.setItem(chave,JSON.stringify(dados));
+  const ler = () => {const texto=localStorage.getItem(chave);if(texto){try{const d=JSON.parse(texto);d.usuarios.forEach(u=>u.permissoes??={pedidos:true,estoque:true,financeiro:true});return d;}catch(e){console.warn('Dados locais inválidos',e);}}const d=inicial();salvar(d);return d;};
+  const atualizar = fn => {const d=ler();const r=fn(d);salvar(d);return r;};
+  const restaurar = () => salvar(inicial());
+  return {ler,salvar,atualizar,restaurar,dia,agora,id};
+})();
