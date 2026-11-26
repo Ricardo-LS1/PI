@@ -6,3 +6,9 @@ document.querySelectorAll('[data-demo]').forEach(b=>b.onclick=()=>{const u=Dados
 $('#reset').onclick=()=>{confirmUI('Restaurar dados fictícios','Os registros locais serão substituídos.',()=>{Dados.restaurar();localStorage.removeItem('gato-session');form.reset();$('#login-error').textContent='';feedback('Dados de demonstração restaurados.');});};
 
 $('#show-password').onclick=()=>{const b=$('#show-password'),on=form.elements.senha.type==='password';form.elements.senha.type=on?'text':'password';b.textContent=on?'Ocultar':'Mostrar';b.setAttribute('aria-pressed',String(on));};
+
+// Em telas compactas, os perfis de demonstração ficam sob demanda.
+const demoDetails=$('.demo-disclosure');
+const compactLogin=matchMedia('(max-width: 760px)');
+demoDetails.open=!compactLogin.matches;
+compactLogin.addEventListener('change',e=>{demoDetails.open=!e.matches;});

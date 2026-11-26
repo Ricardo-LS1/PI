@@ -1,208 +1,170 @@
-# Documentação técnica — O Gato Preto Café (V3)
+# Documentação técnica — O Gato Preto Café (V4.1)
 
-[Voltar ao README](README.md) · [Acessar o protótipo](https://ricardo-ls1.github.io/PI/)
+[Voltar ao README](README.md)
 
-Documento complementar ao README, destinado ao acompanhamento técnico e acadêmico do Projeto Integrador. Atualizado com base no diagrama V3, no ZIP da versão 3 e nos registros de revisão que acompanham o código. Não constitui homologação do sistema pela empresa.
+Documento complementar ao README, organizado a partir do registro técnico original do protótipo V2. Descreve a correspondência entre a modelagem e as funcionalidades demonstradas, as escolhas de implementação e as verificações registradas. Não representa homologação do sistema pela empresa.
 
 ## Referências do projeto
 
-- Diagrama Gato Preto Café Revisado (5 páginas): linha de base com 21 casos de uso.
-- Diagrama Gato Preto Café V3 (7 páginas): 30 casos de uso, 66 subfunções e 132 operações, incluindo regras de integração.
-- Sistema de Gestão do O Gato Preto Café (6 páginas): contexto empresarial e proposta de solução.
-- Código-fonte e registro técnico do `gato-preto-cafe-prototipo-v3.zip`.
+- Diagrama Gato Preto Café Revisado (5 páginas).
+- Sistema de Gestão do O Gato Preto Café (6 páginas).
 
-O logotipo SVG é uma proposta gráfica, não uma reprodução confirmada da marca oficial. Login, tema, responsividade e recursos de interface complementam a modelagem sem alterar a contagem de casos de uso.
-
-## Arquitetura e responsabilidades
-
-A arquitetura é estática, com HTML5, CSS3, JavaScript, SVG e LocalStorage. O GitHub Pages entrega os arquivos; toda a lógica de negócio ocorre no navegador.
-
-| Arquivo | Responsabilidade |
-| --- | --- |
-| `index.html`, `pages/*.html` | Login e páginas internas. |
-| `css/style.css` | Layout, temas, gráficos, responsividade e impressão. |
-| `js/dados.js` | Base de demonstração, migração, validação, gravação, integração e históricos. |
-| `js/global.js` | Sessão, permissões, navegação, filtros, componentes, gráficos, notificações e pesquisa. |
-| `js/login.js` | Entrada, credenciais demonstrativas e restauração. |
-| `js/dashboard.js` | Painel geral, filtros e indicadores autorizados. |
-| `js/pedidos.js` | Registro, consulta, edição, status, conclusão e cancelamento. |
-| `js/estoque.js` | Produtos, entradas, saídas, ajustes e alertas. |
-| `js/financeiro.js` | Recebimentos, despesas, quitações, estornos, fluxo de caixa e relatórios. |
-| `js/administracao.js` | Usuários, permissões, configurações, backup e atividades. |
-| `assets/logo.svg` | Identidade gráfica do protótipo. |
+A modelagem revisada orienta o detalhamento dos casos de uso. Login, painel inicial, exportação CSV, restauração de dados e identidade visual complementam a demonstração. O logotipo SVG é uma proposta gráfica, não uma reprodução do logotipo oficial.
 
 ## Matriz de rastreabilidade
 
-Cada linha identifica um caso de uso. Cada subfunção está em negrito, seguida de suas duas operações internas, separadas por `/`. A matriz corresponde à modelagem V3 e aos pontos de implementação identificados no ZIP; não equivale a 132 testes independentes.
-
 ### Pedidos
 
-| ID / Caso de uso | Subfunções e operações | Implementação |
+| Caso de uso | Operações representadas | Interface |
 | --- | --- | --- |
-| P01 Registrar pedido | **Montar pedido:** selecionar produtos / informar quantidades. **Concluir registro:** verificar disponibilidade / calcular total e salvar. | Pedidos → Registrar pedido; `pedidos.js` |
-| P02 Consultar pedidos | **Localizar pedidos:** pesquisar por número / filtrar por data ou status. **Examinar pedido:** ver itens e quantidades / consultar valor e situação. | Consultar pedidos e Ver pedido |
-| P03 Atualizar status | **Validar alteração:** localizar pedido / verificar transição permitida. **Registrar mudança:** selecionar novo status / salvar data da atualização. **Encaminhar conclusão:** acionar Finalizar pedido / manter histórico da transição. | Atualizar status, ações rápidas, `mudarStatus`, `finalizarUI` |
-| P04 Cancelar pedido | **Verificar cancelamento:** localizar pedido / conferir situação atual. **Efetivar cancelamento:** informar motivo / registrar status cancelado. **Tratar consequências:** verificar pagamento e estornar se devido / avaliar devolução e registrar se cabível. | Cancelar pedido e ação rápida; `Dados.cancelar` |
-| P05 Consultar histórico de pedidos | **Pesquisar registros:** selecionar período / filtrar por situação. **Consultar eventos:** ver criação e alterações / ver datas de cancelamento. | Histórico de pedidos; Ver histórico |
-| P06 Editar pedido | **Alterar composição:** adicionar ou remover produtos / alterar quantidades. **Validar alterações:** verificar disponibilidade / recalcular total e salvar. | Ação Editar, `editarUI`, `Dados.validarItens` |
-| P07 Finalizar pedido | **Validar finalização:** conferir situação e estoque / impedir conclusão e lançamentos duplicados. **Confirmar pagamento:** selecionar forma / confirmar recebimento. **Consolidar operação:** registrar conclusão, data e responsável / integrar saída e recebimento. | Ação Finalizar; `finalizarUI`, `Dados.finalizar` |
+| Registrar pedido | Escolher produtos e quantidades; conferir disponibilidade; calcular total; gravar registro. | Registrar pedido |
+| Consultar pedidos | Buscar número; filtrar data e situação; conferir itens, quantidades, valor e status. | Consultar pedidos / Ver pedido |
+| Atualizar status | Localizar registro; validar transição; definir novo status; armazenar data da alteração. | Atualizar status |
+| Cancelar pedido | Encontrar pedido; conferir possibilidade de cancelamento; informar motivo; registrar situação. | Cancelar pedido |
+| Consultar histórico | Filtrar período e situação; visualizar criação, alterações e cancelamentos com respectivas datas. | Histórico de pedidos |
 
 ### Estoque
 
-| ID / Caso de uso | Subfunções e operações | Implementação |
+| Caso de uso | Operações representadas | Interface |
 | --- | --- | --- |
-| E01 Cadastrar produtos | **Identificar produto:** nome e categoria / unidade e descrição. **Definir parâmetros:** preço de venda / saldo inicial e mínimo. | Estoque → Cadastrar produtos |
-| E02 Consultar estoque | **Pesquisar produtos:** buscar nome / filtrar categoria. **Verificar disponibilidade:** consultar quantidade atual / consultar preço e unidade. | Consultar estoque |
-| E03 Registrar entrada | **Identificar item:** pesquisar produto / conferir cadastro. **Registrar entrada:** informar quantidade e data / atualizar saldo e histórico. | Registrar entrada |
-| E04 Registrar saída | **Validar retirada:** selecionar produto / conferir saldo. **Registrar saída:** informar quantidade e motivo / atualizar saldo e histórico. **Integrar pedido:** identificar pedido e itens / impedir baixa duplicada ou saldo negativo. | Registrar saída, `Dados.finalizar` |
-| E05 Ajustar estoque | **Conferir divergência:** consultar saldo / informar quantidade apurada. **Aplicar correção:** registrar justificativa / atualizar saldo e histórico. | Ajustar estoque |
-| E06 Consultar produtos com estoque baixo | **Detectar nível baixo:** comparar saldo ao mínimo / identificar itens abaixo. **Consultar alertas:** listar críticos / filtrar categoria. | Estoque baixo, notificações |
-| E07 Gerenciar produtos cadastrados | **Editar produto:** alterar dados / atualizar preço e mínimo. **Controlar disponibilidade:** ativar/inativar / preservar histórico. | Gerenciar produtos, ação Editar |
+| Cadastrar produtos | Informar nome, categoria, unidade, descrição, preço e quantidades inicial e mínima. | Cadastrar produtos |
+| Consultar estoque | Pesquisar por nome e categoria; consultar quantidade disponível, preço e unidade. | Consultar estoque |
+| Registrar entrada | Selecionar e conferir produto; informar quantidade e data; atualizar saldo e histórico. | Registrar entrada |
+| Registrar saída | Selecionar produto; verificar saldo; indicar quantidade e motivo; atualizar saldo e histórico. | Registrar saída |
+| Ajustar estoque | Comparar saldo registrado e apurado; justificar correção; atualizar saldo e histórico. | Ajustar estoque |
+| Consultar produtos com estoque baixo | Comparar quantidade com mínimo; identificar itens críticos; consultar alertas por categoria. | Estoque baixo |
 
 ### Financeiro
 
-| ID / Caso de uso | Subfunções e operações | Implementação |
+| Caso de uso | Operações representadas | Interface |
 | --- | --- | --- |
-| F01 Registrar recebimentos | **Identificar origem:** vincular pedido quando houver / selecionar forma. **Registrar entrada:** informar valor e data / salvar no caixa. **Integrar venda:** receber dados do pedido pago / impedir lançamento duplicado. | Financeiro → Registrar recebimentos, `Dados.finalizar` |
-| F02 Registrar despesas | **Caracterizar despesa:** informar descrição / selecionar categoria. **Lançar despesa:** informar valor e data / definir situação. | Registrar despesas |
-| F03 Consultar receitas | **Pesquisar recebimentos:** filtrar período / filtrar forma. **Consolidar receitas:** exibir lançamentos / calcular total recebido. | Consultar receitas |
-| F04 Consultar despesas | **Pesquisar despesas:** filtrar período / filtrar categoria. **Consolidar despesas:** exibir lançamentos / calcular total de despesas. | Consultar despesas |
-| F05 Consultar fluxo de caixa | **Apurar movimentações:** somar recebimentos / somar despesas. **Apresentar saldo:** calcular saldo do período / exibir evolução por data. | Fluxo de caixa, `caixa`, `financialSeries` |
-| F06 Gerar relatórios financeiros | **Definir relatório:** escolher tipo / selecionar período. **Preparar relatório:** consolidar dados e totais / visualizar ou exportar. | Relatórios financeiros, CSV, `imprimirRelatorio` |
-| F07 Consultar histórico financeiro | **Pesquisar lançamentos:** selecionar período / filtrar entrada ou saída (e estorno). **Examinar registros:** consultar origem e valor / consultar data de registro. | Histórico financeiro |
-| F08 Quitar despesas pendentes | **Identificar despesa:** localizar lançamento / conferir situação. **Registrar pagamento:** informar data e forma / atualizar caixa. | Quitar despesas, `Dados.quitar` |
-| F09 Registrar estornos | **Identificar recebimento:** localizar pagamento original / verificar estornos anteriores. **Efetivar estorno:** registrar valor e justificativa / atualizar saldo e histórico. | Registrar estornos, `Dados.estornar` |
+| Registrar recebimentos | Identificar origem e eventual pedido associado; selecionar pagamento; registrar valor e data. | Registrar recebimentos |
+| Registrar despesas | Definir descrição e categoria; registrar valor, data e situação. | Registrar despesas |
+| Consultar receitas | Filtrar período e pagamento; consultar lançamentos e total. | Consultar receitas |
+| Consultar despesas | Filtrar período e categoria; consultar lançamentos e total. | Consultar despesas |
+| Consultar fluxo de caixa | Apurar receitas e despesas pagas; exibir saldo e evolução temporal. | Fluxo de caixa |
+| Gerar relatórios | Definir tipo e período; consolidar informações; visualizar ou exportar. | Relatórios financeiros |
+| Consultar histórico | Pesquisar período e tipo; examinar origem, valor e data de registro. | Histórico financeiro |
 
 ### Administração
 
-| ID / Caso de uso | Subfunções e operações | Implementação |
+| Caso de uso | Operações representadas | Interface |
 | --- | --- | --- |
-| A01 Cadastrar usuários | **Identificar usuário:** nome e login / credenciais iniciais. **Atribuir acesso:** selecionar perfil / ativar conta. | Administração → Cadastrar usuários |
-| A02 Gerenciar usuários e permissões | **Manter contas:** editar dados / ativar/inativar. **Administrar permissões:** alterar perfil / revisar acessos. **Personalizar acessos:** permitir/bloquear módulos / preservar acesso administrativo e aplicar restrições. | Gerenciar usuários e permissões, `allowed`, `iniciarPagina` |
-| A03 Configurar sistema | **Ajustar operação:** atualizar dados do café / definir formas de pagamento. **Gerenciar configurações:** revisar parâmetros / salvar alterações. | Configurar sistema |
-| A04 Gerenciar backup e restauração | **Exportar dados:** consolidar registros / gerar JSON. **Restaurar dados:** validar arquivo / recuperar registros com confirmação. | Backup e restauração, `Dados.validar` |
-| A05 Consultar histórico de atividades | **Pesquisar atividades:** filtrar usuário / filtrar período ou módulo. **Examinar operações:** identificar ação / consultar data, horário e responsável. | Histórico de atividades, `Dados.atualizar` |
+| Cadastrar usuários | Informar identificação e credenciais; atribuir perfil e condição de ativação. | Cadastrar usuários |
+| Gerenciar usuários e permissões | Editar, ativar ou inativar contas; mudar perfil e configurar permissões por módulo. | Gerenciar usuários e permissões |
+| Configurar sistema | Alterar dados do estabelecimento, pagamentos e parâmetros gerais; gravar configurações. | Configurar sistema |
 
-### Funcionalidades transversais
+## Regras de demonstração
 
-| ID / Caso de uso | Subfunções e operações | Implementação |
-| --- | --- | --- |
-| T01 Consultar dashboards gerenciais | **Analisar indicadores:** selecionar período / comparar resultados. **Explorar gráficos:** consultar valores detalhados / interagir com séries e legendas. | Dashboard geral e dos módulos, `quickPeriodMetrics`, `chartView` |
-| T02 Consultar notificações | **Identificar ocorrências:** verificar estoque baixo e pedidos pendentes / identificar despesas pendentes. **Gerenciar alertas:** consultar detalhes / marcar como lidas. | Central de notificações, `alertas`, `notificationsUI` |
-
-**Total:** 30 casos de uso, 66 subfunções e 132 operações (Pedidos: 7/17/34; Estoque: 7/15/30; Financeiro: 9/19/38; Administração: 5/11/22; Transversais: 2/4/8).
-
-## Integração e relacionamentos UML
-
-O diagrama V3 (página 7) estabelece `«include»` de Finalizar pedido para Registrar recebimentos e Registrar saída de produtos. Registrar estornos estende Cancelar pedido (`«extend»`) quando existe pagamento a estornar. Confirmar pagamento é uma subfunção de Finalizar pedido, não um caso de uso adicional.
-
-```mermaid
-flowchart TD
-    A[Finalizar pedido] --> B{Status, pagamento e estoque válidos?}
-    B -- Não --> C[Rejeitar conclusão sem gravar alterações]
-    B -- Sim --> D[Consolidar operação em uma gravação local]
-    D --> E[Registrar conclusão e histórico]
-    D --> F[Registrar ou conciliar recebimento]
-    D --> G[Registrar baixa de estoque]
-    E --> H[Atualizar indicadores]
-    F --> H
-    G --> H
-    I[Cancelar pedido com justificativa] --> J{Existe saldo a estornar?}
-    J -- Sim --> K[Registrar estorno devido]
-    J -- Não --> L[Avaliar reposição]
-    K --> L
-    L --> M{Produto pode retornar e existe baixa V3 rastreável?}
-    M -- Sim --> N[Registrar reposição quando autorizada]
-    M -- Não --> O[Preservar estoque]
-    N --> P[Registrar cancelamento e histórico]
-    O --> P
-```
-
-## Regras de negócio
-
-As quatro primeiras regras seguem a página 7 do diagrama V3. As demais detalham decisões de implementação documentadas no ZIP.
-
-**RN01 — Consistência.** Somente concluir pedido válido com pagamento confirmado e estoque suficiente. `Dados.finalizar` revalida status, quantidades, produtos ativos e disponibilidade. Pedido, recebimento, baixa e históricos são persistidos em uma atualização do objeto local; falha antes da gravação preserva o estado anterior. Não há reserva de estoque ao registrar o pedido nem garantia de transações concorrentes entre abas.
-
-**RN02 — Sem duplicidade.** Cada venda é identificada pelo pedido. Não repetir a conclusão, a receita ou a baixa. Um recebimento manual vinculado, íntegro, com valor total e forma coincidentes pode ser conciliado na conclusão; divergências, múltiplos recebimentos ou estornos anteriores exigem conferência. Lançamentos manuais sem vínculo continuam disponíveis.
-
-**RN03 — Cancelamento e estorno.** Cancelamentos exigem justificativa e podem ocorrer após a conclusão. Estornar somente o saldo ainda devido dos recebimentos associados. A reposição é opcional e limitada às baixas automáticas V3 rastreáveis e aos produtos que efetivamente possam retornar. Estorno manual não altera automaticamente a situação do pedido nem recompõe estoque. O histórico é preservado.
-
-**RN04 — Acesso.** Administração é exclusiva do perfil Administrador. Os módulos operacionais são configuráveis por conta, sem permitir a perda do próprio acesso administrativo. Menu, dashboards, notificações e pesquisa respeitam as permissões. A integração interna de um pedido autorizado pode gerar registros em módulos restritos, sem conceder acesso à interface. As restrições são simuladas.
-
-**RN05 — Pedidos.** Estados: Pendente, Em preparo, Pronto, Concluído e Cancelado. Avanços diretos são permitidos; a conclusão sempre utiliza a rotina integrada. Pedidos não pagos permanecem em andamento. A edição é restrita a pedidos em andamento e o preço histórico dos itens é preservado. Não há pagamento dividido ou parcelado nem processamento real.
-
-**RN06 — Estoque.** A baixa corresponde à quantidade de produtos vendidos, não a ingredientes. Produtos inativos não entram em novos pedidos. O saldo não pode ficar negativo. Pedidos utilizam quantidades inteiras, enquanto movimentações admitem até três casas decimais. Alerta de estoque baixo: produto ativo com saldo estritamente inferior ao mínimo.
-
-**RN07 — Financeiro.** Valores em BRL. Receitas líquidas incluem estornos como lançamentos negativos. Despesas pendentes não afetam o caixa; a quitação utiliza a data efetiva de pagamento, preservando a data original. Saldo do período = receitas líquidas − despesas pagas, sem saldo anterior. Estornos não movimentam dinheiro real.
-
-**RN08 — Indicadores.** Pedidos são filtrados pela data de registro; o ticket médio considera pedidos concluídos no período. Estoque apresenta a posição corrente, não uma reconstrução histórica. O faturamento recebido bruto considera os recebimentos positivos, inclusive manuais; o gráfico de formas de pagamento é bruto, sem deduzir estornos. Comparações utilizam período anterior de mesma duração e não inventam percentuais quando a base é zero.
-
-**RN09 — Migração.** A chave `gato-preto-cafe-v1` permanece a mesma. A migração preserva as coleções anteriores e acrescenta campos padrão. Pedidos concluídos antigos são identificados como legado e não geram receita ou baixa retroativa; divergências anteriores exigem conciliação manual. A migração não inventa responsáveis por operações antigas.
-
-**RN10 — Backup e restauração.** Importações validadas e confirmadas substituem a base local e encerram a sessão. A validação verifica estrutura, identificadores, referências básicas, estornos e presença de administrador ativo; não constitui auditoria contábil. A restauração dos dados fictícios é destrutiva para os registros locais.
+- **Pedidos:** estados progressivos (Pendente, Em preparo, Pronto, Concluído) admitem avanço direto entre etapas. Cancelamentos exigem motivo e ocorrem antes da conclusão. As regras são propostas, sem validação empresarial registrada.
+- **Integração operacional:** disponibilidade é verificada ao montar o pedido, mas não há reserva ou baixa automática. Movimentações e recebimentos são lançados nos módulos próprios.
+- **Estoque:** alerta somente quando a quantidade fica abaixo do mínimo. Pedidos utilizam quantidades inteiras; movimentações admitem até três casas decimais. O catálogo demonstra produtos comercializados individualmente.
+- **Financeiro:** o saldo do período corresponde às receitas menos despesas pagas, sem incorporar saldo anterior. Despesas pendentes permanecem na consulta, mas não integram o cálculo de caixa. A moeda é BRL.
+- **Permissões:** Administração é exclusiva do perfil Administrador. Os acessos operacionais são configuráveis por conta, e a própria sessão administrativa não pode perder seu acesso administrativo. A ausência de acesso ao Estoque não impede a seleção de produtos nos Pedidos, mas oculta os saldos; a ausência de acesso a Pedidos impede novos vínculos de recebimento a pedidos. Lançamentos anteriores permanecem consultáveis no módulo autorizado.
+- **Persistência:** informações, sessão e preferências são mantidas localmente. Registros da V1 podem persistir na mesma origem; contas antigas recebem permissões padrão. Restaurar a demonstração substitui a base local.
 
 ## Indicadores, filtros e relatórios
 
-- Os dashboards usam dados locais e respeitam as permissões. Filtros rápidos contemplam hoje, ontem, últimos 7 ou 30 dias, mês atual, mês anterior e período personalizado; a preferência é mantida por usuário e página.
-- Gráficos nativos de pizza, rosca, linha, área e barras horizontais/verticais utilizam SVG e CSS. Tooltips, foco, toque e legendas interativas permitem consultar detalhes e alternar séries.
-- A posição de estoque é corrente. O ranking de vendas considera pedidos concluídos e os gráficos de movimentação contam registros por tipo, evitando somar unidades incompatíveis.
-- Campos de data utilizam digitação brasileira e calendário nativo. Lançamentos sugerem a data atual; filtros podem iniciar vazios ou recuperar a preferência. Períodos inválidos são rejeitados.
-- O CSV permite análise em planilhas, sem integração automática com Excel. O PDF é gerado via impressão nativa, com layout A4, logotipo, indicadores, gráficos, tabelas e numeração. A apresentação depende do navegador e das opções de impressão.
-- A tela cheia possui alternativa de layout quando a API não está disponível. Controles remotos e televisores antigos exigem validação no próprio dispositivo.
+- Os indicadores gerais de cada módulo abrangem o histórico disponível; os dashboards expandidos seguem os filtros independentes. Estoque apresenta sua posição corrente.
+- O ranking de produtos vendidos considera pedidos concluídos. O gráfico de movimentações de estoque conta registros por tipo, evitando agregar unidades incompatíveis.
+- Os campos de data usam máscara brasileira e calendário nativo. Lançamentos sugerem o dia atual, enquanto filtros iniciam vazios. Períodos inválidos preservam o último resultado válido e impedem a exportação.
+- Os gráficos são elaborados com SVG e CSS, sem biblioteca gráfica externa.
+- A exportação CSV permite análise em planilhas, sem integração automática com o Excel. O PDF utiliza a impressão nativa do navegador, com formato A4, capa gerencial, resumo, gráfico, tabelas e numeração. A apresentação final depende das opções de impressão.
+- A tela cheia possui alternativa visual quando a API do navegador não está disponível. A compatibilidade em televisores antigos deve ser verificada no próprio aparelho.
 
-## Backup e recuperação
+## Verificações registradas na V2
 
-1. Acesse Administração → Backup e restauração.
-2. Exporte o backup JSON e mantenha uma cópia local identificada pela data.
-3. Para recuperar dados, selecione o JSON, confirme a substituição e entre novamente no sistema.
-4. Utilize Restaurar dados de demonstração somente se desejar substituir os registros pelos dados iniciais.
+Os itens abaixo correspondem aos testes descritos na documentação original, não a uma nova execução de testes durante a reorganização do README.
 
-O arquivo inclui versão, data, registros, usuários, credenciais demonstrativas, permissões, configurações, históricos e marcações de notificações. Tema e filtros são preferências locais e não fazem parte do backup operacional. Não utilize dados reais. A base é compartilhada apenas por páginas da mesma origem no mesmo navegador; dados não acompanham a conta GitHub ou a publicação.
-
-## Verificações registradas na V3
-
-Os resultados abaixo foram extraídos do registro técnico entregue com o ZIP V3. Não são uma nova execução de testes realizada na atualização destes arquivos. O ambiente original bloqueou navegação direta HTTP/HTTPS; os testes de interface utilizaram Chromium com HTML, CSS e scripts carregados diretamente e armazenamento simulado, transferindo o estado entre telas. O teste de migração utilizou a implementação de dados do ZIP V2.
-
-| ID | Cenário / entrada | Resultado esperado | Resultado registrado |
-| --- | --- | --- | --- |
-| CT01 | Login e tema | Preencher credenciais, mostrar senha e alternar tema. | Controles exercitados. |
-| CT02 | Pedido de R$ 16,00; estoque inicial de 10; quantidade 2 | Concluir, baixar 2 unidades e registrar uma receita. | Estoque 10 → 8; receita R$ 16,00. |
-| CT03 | Repetir conclusão do mesmo pedido | Rejeitar sem alterar registros. | Segunda conclusão rejeitada. |
-| CT04 | Pagamento não confirmado ou forma inválida | Não concluir nem gravar movimentações. | Rejeitados sem gravação. |
-| CT05 | Estoque insuficiente | Preservar pedido, receitas e movimentos. | Registros preservados. |
-| CT06 | Cancelar pedido pago e autorizar reposição | Estornar e recompor estoque elegível. | Estorno integral e reposição registrados. |
-| CT07 | Estorno parcial e valor excedente | Aceitar saldo válido; rejeitar excedente. | Parcial aceito; excedente rejeitado. |
-| CT08 | Editar pedido em andamento | Alterar itens e recalcular. | Quantidade, remoção e recálculo exercitados. |
-| CT09 | Cadastrar, editar e inativar produto | Persistir cadastro; impedir novas vendas do inativo. | Operações exercitadas; produto excluído da seleção de novos pedidos. |
-| CT10 | Quitar despesa pendente | Alterar situação e contabilizar pagamento. | Quitação registrada. |
-| CT11 | Bloquear Estoque para gerente | Restringir acesso, menu, dashboard e alertas. | Restrições verificadas no ambiente simulado. |
-| CT12 | Exportar/importar JSON; arquivo inválido | Recuperar registros válidos e rejeitar inválidos. | Exportação, validação, importação e rejeição exercitadas. |
-| CT13 | Dashboard com filtro, tooltip e legenda | Atualizar e explorar informações. | Filtro, tooltip, legenda e preferência de período exercitados. |
-| CT14 | Notificações e pesquisa global | Marcar alerta como lido e consultar registros autorizados. | Marcação e pesquisa exercitadas. |
-| CT15 | Migrar V2 e conciliar recebimento manual | Preservar registros e evitar duplicação. | Registros e saldos preservados; legado identificado; receita não duplicada. |
-| CT16 | Simular falha de quota de armazenamento | Preservar estado persistido. | Estado preservado. |
-| CT17 | Exportar CSV e imprimir fluxo de caixa | Gerar saída e relatório A4 legível. | Download CSV registrado; PDF de duas páginas inspecionado. |
-| CT18 | Abrir seis páginas em nove resoluções | Sem transbordamento horizontal global no estado inicial. | Verificação registrada para todas as seis páginas. |
-
-Resoluções verificadas: 320 × 568, 360 × 800, 390 × 844, 768 × 1024, 1024 × 768, 1366 × 768, 1920 × 1080, 2560 × 1440 e 3840 × 2160. Os conjuntos de testes descritos no registro técnico não apresentaram erros JavaScript após correções. A matriz de rastreabilidade não equivale a um teste separado de cada operação.
+| Área | Verificação registrada |
+| --- | --- |
+| Código e estrutura | Revisão da rastreabilidade, sintaxe JavaScript e caminhos relativos do HTML. |
+| Operações | Testes em Chromium com arquivos carregados diretamente e armazenamento simulado: login, filtros, tema, operações de estoque, pedidos, históricos, recebimentos, despesas e permissões. |
+| Responsividade | Cinco páginas internas verificadas em larguras de 360, 768, 1920 e 3840 pixels, sem transbordamento horizontal global registrado. |
+| Impressão | PDF de fluxo de caixa inspecionado; quebra de página do rodapé corrigida. |
 
 ### Validações pendentes
 
-- Homologação da navegação real no endereço definitivo e da persistência nativa entre páginas e abas.
-- Verificação do download CSV, importação e exportação no navegador publicado.
-- Testes em Firefox, outros navegadores, Smart TVs físicas, controles remotos e calendário nativo.
-- Inspeção de todos os estados de formulários, modais, temas, relatórios extensos e acessibilidade.
-- Validação das regras de negócio e da experiência de uso com os proprietários do estabelecimento.
+O ambiente original restringiu a navegação direta por HTTP, HTTPS e `file://`. Portanto, não houve homologação da navegação real entre páginas, da persistência real entre páginas, do download CSV pelo navegador nem da publicação. Nem todos os cenários de erro, navegadores, controles remotos, calendários nativos e dispositivos foram testados.
 
-## Histórico de versões
-
-| Versão | Modelagem e evolução |
-| --- | --- |
-| V1 | Base navegável dos quatro módulos. |
-| V2 | 21 casos de uso; dashboards, relatórios, permissões e responsividade ampliados. |
-| V3 | 30 casos de uso; integração, estornos, edição, quitação, backups, atividades, notificações e gráficos interativos. |
+Recomenda-se validar esses pontos em hospedagem real, no Firefox e em outros navegadores, bem como nos dispositivos usados durante a apresentação.
 
 ## Segurança e escopo
 
-O protótipo não possui autenticação segura, API, banco centralizado, sincronização, auditoria imutável ou comunicação automática com WhatsApp e Excel. As credenciais e os dados podem ser inspecionados ou alterados no navegador. Não há emissão fiscal, gestão de fornecedores, fichas técnicas, controle de validade ou integração real com pagamentos. Utilize exclusivamente dados fictícios. As regras e resultados são demonstrativos, sujeitos à validação empresarial.
+O protótipo não implementa segurança de produção, API, banco de dados centralizado nem comunicação automática com WhatsApp. As restrições de interface não impedem a inspeção ou alteração do armazenamento local. Utilize apenas dados fictícios.
+
+
+## Redesign V4
+
+A camada de apresentação foi refinada sem alterações no modelo de dados (`js/dados.js`) ou nos quatro módulos de negócio (`js/pedidos.js`, `js/estoque.js`, `js/financeiro.js`, `js/administracao.js`). A folha `css/v4.css` complementa o CSS original. Os componentes compartilhados em `js/global.js` e o dashboard foram reorganizados.
+
+- Indicadores prioritários: pedidos registrados, estoque baixo, receitas líquidas e saldo do período, conforme as permissões. Indicadores restantes e gráficos ficam disponíveis em seções expansíveis.
+- As operações são exibidas antes dos painéis de análise. No celular, o seletor de funcionalidades substitui a barra de abas; a navegação inferior respeita as permissões.
+- Tabelas extensas exibem campos prioritários em listas compactas no celular. O botão de detalhes revela as demais colunas e ações; as tabelas desktop mantêm ordenação e paginação.
+- A chave e o mecanismo de armazenamento local não foram alterados. Autenticação, autorização e dados permanecem demonstrativos, sem servidor.
+
+O arquivo ZIP de origem não continha os PDFs de referência citados na documentação; a matriz existente foi preservada, mas não foi possível comparar diretamente com os diagramas originais.
+
+### Validação da V4
+
+Verificações realizadas em Chromium com os arquivos locais inseridos diretamente no documento do navegador, sem navegação externa; a API de armazenamento foi simulada em memória, devido ao bloqueio de navegação do ambiente de testes.
+
+| Verificação | Resultado |
+| --- | --- |
+| Sintaxe de todos os arquivos JavaScript (`node --check`) | Sem erros |
+| 162 combinações de telas (dashboard e 26 funcionalidades) em 360, 390, 768, 1024, 1366 e 1920 px | Sem erros JavaScript capturados ou rolagem horizontal da página |
+| Cadastro de produto e movimentação de entrada | Saldo atualizado corretamente |
+| Registro e conclusão de pedido | Baixa no estoque e recebimento integrado confirmados |
+| Registro de despesa pendente, recarregamento simulado e quitação | Registro mantido e situação atualizada |
+| Menu recolhível, seletor mobile, expansão de registro, tema, pesquisa, notificações, período e controle de legenda | Verificações funcionais concluídas |
+| Perfil Gerente | Administração ausente do menu |
+
+As verificações não equivalem a uma homologação completa. A navegação entre páginas em hospedagem real, o `localStorage` real após atualização do site, a impressão em PDF, os downloads e os testes em dispositivos físicos ainda devem ser validados. Não foram executados todos os cenários de exceção de cada regra de negócio. As capturas da interface foram produzidas no ambiente offline com dados de demonstração.
+
+## V4.1 — Navegação contextual e login compacto
+
+### Implementação
+
+A central de notificações passou a gerar links relativos com os parâmetros `alerta` e `registro`. O módulo de destino valida o tipo de alerta e a permissão existente, seleciona a aba e aplica os filtros. O registro é identificado por ID, inclusive quando está em uma página posterior da tabela. O destaque visual dura cerca de 6,5 segundos, com expansão automática dos detalhes em tela pequena. O botão **Limpar filtros** retorna à consulta geral e remove os parâmetros contextuais. Alterações manuais nos filtros também removem esses parâmetros. Links desatualizados mostram uma mensagem, sem modificar registros. A marcação como lida continua manual, preservando o mecanismo existente.
+
+| Alerta existente | Destino | Filtro |
+| --- | --- | --- |
+| Produto ativo abaixo do mínimo | Estoque / Estoque baixo | Todos abaixo do mínimo |
+| Produto abaixo do mínimo com saldo zero | Estoque / Estoque baixo | Esgotados |
+| Pedido pendente | Pedidos / Consultar pedidos | Pendente |
+| Pedido em preparo | Pedidos / Consultar pedidos | Em preparo |
+| Pedido pronto | Pedidos / Consultar pedidos | Pronto |
+| Despesa pendente | Financeiro / Consultar despesas | Pendente |
+
+Não foram criadas notificações de atraso ou vencimento: a versão de origem não define prazos de entrega nem datas de vencimento de despesas. O filtro de esgotados é uma subdivisão dos produtos já considerados críticos, sem alterar a regra original de estoque baixo. O filtro de situação financeira também está disponível na consulta normal.
+
+No login, a área promocional é reduzida à marca em telas de até 760 px, as credenciais demonstrativas ficam em um elemento `details` recolhido inicialmente e o formulário utiliza alturas dinâmicas (`svh`/`dvh`). O fluxo natural de rolagem é preservado para acomodar teclado, telas baixas e seções abertas. O desktop mantém a apresentação de duas colunas quando o layout existente permite.
+
+### Arquivos modificados
+
+| Arquivo | Alteração |
+| --- | --- |
+| `index.html`, `js/login.js` | Seção de demonstração expansível, comportamento responsivo; autenticação mantida. |
+| `css/v4.css` | Login compacto e estilos de links, contexto e destaque de registros. |
+| `js/global.js` | Links contextuais, seleção inicial de aba, identificação de registros e paginação direcionada. |
+| `js/estoque.js` | Filtro de saldo para estoque baixo e identificação de linhas. |
+| `js/pedidos.js` | Identificação das linhas de pedidos, reutilizando filtro de status. |
+| `js/financeiro.js` | Filtro de situação da despesa, total correspondente e identificação das linhas. |
+| `README.md`, `DOCUMENTACAO.md` | Versão, instruções, escopo e validação. |
+
+`js/dados.js`, `js/administracao.js`, `js/dashboard.js`, `css/style.css`, as páginas internas e o logotipo foram mantidos sem alterações. Não foram adicionadas dependências.
+
+### Validação da V4.1
+
+| Teste | Resultado |
+| --- | --- |
+| Sintaxe de todos os arquivos JavaScript | Sem erros (`node --check`). |
+| 42 cenários contextuais (seis tipos de destino e um registro em página posterior, em seis larguras) | Links gerados, abas e filtros corretos, identificação/destaque, paginação e limpeza de contexto aprovados com parâmetros simulados. |
+| 162 combinações de telas e funcionalidades nas seis larguras | Sem erros JavaScript capturados e sem rolagem horizontal da página. |
+| Login em 360×640, 390×844, 768×1024, 1024×768, 1366×768 e 1920×1080 | Conteúdo inicial sem rolagem vertical ou horizontal; perfis de demonstração acessíveis. |
+| Login em 360×320, com foco no campo de senha | Botão acessível com rolagem; simulação de área reduzida, não teclado físico. |
+| Autenticação válida e inválida; perfis Administrador e Gerente | Sessão e destino lógico verificados com armazenamento e redirecionamento simulados. |
+| Cadastro e entrada de produto; registro e conclusão de pedido | Saldo e recebimento integrado verificados com armazenamento simulado. |
+| Link de registro indisponível | Mensagem contextual e retorno à consulta aprovados. |
+
+Os testes foram realizados com Chromium e inserção direta dos arquivos no documento. A navegação HTTP/HTTPS foi bloqueada pelo ambiente. Os parâmetros de navegação, a limpeza da URL, a mudança de página após login e o armazenamento foram simulados; por isso não constituem uma validação de ponta a ponta em hospedagem real. Permanecem pendentes a publicação no GitHub Pages, a persistência entre páginas e versões em navegador real, o teclado virtual de um smartphone físico, outros navegadores, impressão/PDF e downloads. Os PDFs de modelagem não acompanham o ZIP de origem. A autenticação segue demonstrativa, sem segurança de produção.
