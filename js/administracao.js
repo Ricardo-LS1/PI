@@ -1,12 +1,219 @@
-if(iniciarPagina('administracao')){
-const perfis=['Gerente','Administrador'];const tabs=['Gerenciar usuários e permissões','Cadastrar usuários','Configurar sistema','Backup e restauração','Histórico de atividades'];
-const metricas=()=>{const us=Dados.ler().usuarios;$('#metricas').innerHTML=stat('Usuários cadastrados',us.length,'Contas demonstrativas','administracao')+stat('Contas ativas',us.filter(u=>u.ativo).length,'Acesso habilitado','check')+stat('Administradores',us.filter(u=>u.perfil==='Administrador').length,'Acesso integral','administracao')+stat('Gerentes',us.filter(u=>u.perfil==='Gerente').length,'Acesso operacional','dashboard');};
-const chaves=['pedidos','estoque','financeiro'];
-const acessos=(perfil,permissoes={})=>`<div class="permission-panel"><strong>Acesso por módulo</strong><p class="muted">Personalize os acessos operacionais desta conta.</p>${chaves.map(k=>`<label class="permission-row"><span>${icon(k)} <strong>${modules.find(m=>m[0]===k)[1]}</strong></span><span class="switch"><input type="checkbox" name="perm_${k}" ${permissoes[k]!==false?'checked':''}><span class="slider"></span></span></label>`).join('')}<div class="permission-row"><span>${icon('administracao')} Administração</span>${pill(perfil==='Administrador'?'Ativo':'Inativo')}</div></div>`;
-const resumoAcessos=u=>chaves.filter(k=>allowed(u,k)).map(k=>modules.find(m=>m[0]===k)[1]).join(', ')||'Nenhum módulo operacional';
-const campos=(u=null)=>field('Nome',input('nome','text',`required maxlength="80" value="${esc(u?.nome||'')}"`))+field('Login',input('login','text',`required maxlength="40" value="${esc(u?.login||'')}"`))+field(u?'Nova senha (opcional)':'Senha inicial de demonstração',input('senha','password',`${u?'':'required'} minlength="4" maxlength="64" autocomplete="new-password"`))+field('Perfil de acesso',`<select name="perfil">${perfis.map(p=>`<option ${p===u?.perfil?'selected':''}>${p}</option>`).join('')}</select>`)+`<label class="row full"><input name="ativo" type="checkbox" ${u?.ativo===false?'':'checked'}> Conta ativa</label><div class="full" id="acesso">${acessos(u?.perfil||'Gerente',u?.permissoes)}</div>`;
-function bindPerfil(f){f.elements.perfil.onchange=()=>{const perms=Object.fromEntries(chaves.map(k=>[k,f.elements['perm_'+k].checked]));$('#acesso',f).innerHTML=acessos(f.elements.perfil.value,perms);};}
-function salvarUsuario(v,form,u=null){const nome=requireText(v.nome,'o nome'),login=requireText(v.login,'o login');if(!perfis.includes(v.perfil))throw Error('Perfil inválido.');Dados.atualizar(d=>{if(d.usuarios.some(x=>x.login.toLowerCase()===login.toLowerCase()&&x.id!==u?.id))throw Error('Já existe uma conta com esse login.');const ativo=form.elements.ativo.checked;const permissoes=Object.fromEntries(chaves.map(k=>[k,form.elements['perm_'+k].checked]));if(u&&u.id===session()?.id&&(!ativo||v.perfil!=='Administrador'))throw Error('Não é possível desativar ou remover o perfil administrativo da própria sessão.');if(u){const target=d.usuarios.find(x=>x.id===u.id);Object.assign(target,{nome,login,perfil:v.perfil,ativo,permissoes});if(v.senha)target.senha=v.senha;}else d.usuarios.push({id:Dados.id(),nome,login,senha:requireText(v.senha,'a senha'),perfil:v.perfil,ativo,permissoes});});}
-function render(i){metricas();const root=$('#painel'),d=Dados.ler();if(i===0){root.innerHTML=card('Gerenciar usuários e permissões','Edite contas e personalize as permissões de cada usuário.',tabela(['Nome','Login','Perfil','Situação','Módulos permitidos','Ações'],d.usuarios.map(u=>[esc(u.nome),esc(u.login),esc(u.perfil),pill(u.ativo?'Ativo':'Inativo'),esc(resumoAcessos(u)),btn('Editar / permissões','small',`type="button" data-edit="${esc(u.id)}"`)]))+`<p class="muted" style="margin-top:12px">Administração é exclusiva de administradores. As permissões são simuladas neste navegador.</p>`);root.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>{const u=Dados.ler().usuarios.find(x=>x.id===b.dataset.edit);const dlg=modal('Editar usuário',`<form id="editar" class="form-grid">${campos(u)}<div class="actions full">${btn('Salvar alterações')}</div></form>`);const f=$('#editar',dlg);bindPerfil(f);handle(f,(v,form)=>{salvarUsuario(v,form,u);dlg.close();if(u.id===session()?.id){location.reload();return;}tabsUI.open(0);feedback('Usuário atualizado.');});});}else if(i===1){root.innerHTML=card('Cadastrar usuários','Defina credenciais iniciais, perfil e ativação da conta.',`<form class="form-grid" id="cadastro">${campos()}<div class="note full">As credenciais são fictícias e ficam armazenadas neste navegador. Não use senhas reais.</div><div class="actions full">${btn('Cadastrar usuário')}</div></form>`);const f=$('#cadastro');bindPerfil(f);handle(f,(v,form)=>{salvarUsuario(v,form);tabsUI.open(0);feedback('Usuário cadastrado.');}); }else if(i===3){root.innerHTML=card('Backup e restauração','Exporte os registros locais ou restaure um backup validado.',`<div class="note">O backup contém inclusive credenciais fictícias. Não use dados reais.</div><div class="actions">${btn('Exportar backup JSON','primary','type="button" id="backup"')}</div><form id="importar" class="section-gap">${field('Arquivo de backup',input('arquivo','file','accept=".json,application/json" required'))}${btn('Validar e importar','danger')}</form>`);$('#backup').onclick=()=>{const data=Dados.ler();const b=new Blob([JSON.stringify({versao:3,emitido:Dados.agora(),dados:data},null,2)],{type:'application/json'});const url=URL.createObjectURL(b),a=document.createElement('a');a.href=url;a.download='gato-preto-backup-'+Dados.dia()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);feedback('Backup exportado.');};$('#importar').onsubmit=async e=>{e.preventDefault();try{const file=e.target.elements.arquivo.files[0];if(!file||file.size>5000000)throw Error('Selecione um JSON de até 5 MB.');const obj=JSON.parse(await file.text());const valid=Dados.validar(obj.dados||obj);confirmUI('Restaurar backup',`Backup de ${obj.emitido?horaBR(obj.emitido):'data não informada'}. Os registros locais serão substituídos e a sessão encerrada.`,()=>{Dados.salvar(valid);sair();});}catch(e){feedback(e.message,true);}};}else if(i===4){root.innerHTML=card('Histórico de atividades','Consulte ações, responsáveis, módulo e horário.',`<form id="log-filtro" class="filters">${field('Usuário',input('usuario','search','placeholder="Nome"'))}${field('Módulo',select('modulo',opcoes(modules.slice(1).map(m=>({value:m[0],label:m[1]})),'Todos')))}${dateFields()}</form><div id="log-lista"></div>`);const f=$('#log-filtro');listenFilters(f,()=>{const v=Object.fromEntries(new FormData(f));$('#log-lista').innerHTML=tabela(['Data e hora','Responsável','Módulo','Atividade'],Dados.ler().atividades.filter(a=>(!v.usuario||a.usuario.toLowerCase().includes(v.usuario.toLowerCase()))&&(!v.modulo||a.modulo===v.modulo)&&periodo(a.data.slice(0,10),v.de,v.ate)).reverse().map(a=>[horaBR(a.data),esc(a.usuario),esc(a.modulo),esc(a.acao)]));});}else{root.innerHTML=card('Configurar sistema' ,'Atualize os dados do café, as formas de pagamento e os parâmetros gerais.',`<form class="form-grid" id="config">${field('Nome do estabelecimento',input('nome','text',`required maxlength="100" value="${esc(d.config.nome)}"`),true)}${field('Endereço',input('endereco','text',`required maxlength="200" value="${esc(d.config.endereco)}"`),true)}${field('Formas de pagamento (separadas por vírgula)',input('formas','text',`required maxlength="200" value="${esc(d.config.formas.join(', '))}"`),true)}${field('Moeda','<input value="BRL — Real brasileiro" readonly>')}${field('Observação geral',input('observacao','text',`maxlength="200" value="${esc(d.config.observacao)}"`))}<div class="actions full">${btn('Salvar configurações')}</div></form>`)+card('Dados de demonstração','Reinicie o protótipo antes de uma apresentação, se necessário.',`<p class="muted">Esta ação substitui todos os dados locais pelos registros iniciais e encerra a sessão.</p><div class="actions" style="margin-top:12px">${btn('Restaurar dados de demonstração','danger','type="button" id="reset"')}</div>`);handle($('#config'),v=>{const formas=[...new Set(v.formas.split(',').map(s=>s.trim()).filter(Boolean))];if(!formas.length)throw Error('Informe ao menos uma forma de pagamento.');Dados.atualizar(d=>Object.assign(d.config,{nome:requireText(v.nome,'o nome'),endereco:requireText(v.endereco,'o endereço'),formas,observacao:v.observacao.trim()}));$('.sidebar .brand strong').textContent=Dados.ler().config.nome;document.title='Administração | '+Dados.ler().config.nome;feedback('Configurações salvas.');});$('#reset').onclick=()=>{confirmUI('Restaurar demonstração','Todos os registros locais serão substituídos.',()=>{Dados.restaurar();sair();});};}}
-const tabsUI=abas(tabs,render);
+// Interface administrativa: usuários, permissões, configurações, histórico e backup. As permissões são demonstrativas e não substituem segurança no servidor.
+
+if (iniciarPagina('administracao')) {
+    const perfis = ['Gerente', 'Administrador'];
+    const tabs = ['Gerenciar usuários e permissões', 'Cadastrar usuários', 'Configurar sistema', 'Backup e restauração', 'Histórico de atividades'];
+
+    // Atualiza os indicadores de usuários e acessos.
+    const metricas = () => {
+        const us = Dados.ler().usuarios;
+        $('#metricas').innerHTML = stat('Usuários cadastrados', us.length, 'Contas demonstrativas', 'administracao', { scope: 'Posição atual.' })
+            + stat('Contas ativas', us.filter(u => u.ativo).length, 'Acesso habilitado', 'check', { scope: 'Posição atual.' })
+            + stat('Administradores', us.filter(u => u.perfil === 'Administrador').length, 'Acesso integral', 'administracao', { scope: 'Posição atual.' })
+            + stat('Gerentes', us.filter(u => u.perfil === 'Gerente').length, 'Acesso operacional', 'dashboard', { scope: 'Posição atual.' });
+    };
+    const chaves = ['pedidos', 'estoque', 'financeiro'];
+
+    // Monta as opções de permissão de acordo com o perfil selecionado.
+    const acessos = (perfil, permissoes = {}) => (`<div class="permission-panel">` +
+        `<strong>Acesso por módulo</strong>` +
+        `<p class="muted">Personalize os acessos operacionais desta conta.</p>` +
+        `${chaves.map(k => (`<label class="permission-row">` +
+            `<span>${icon(k)} <strong>${modules.find(m => m[0] === k)[1]}</strong>` +
+            `</span>` +
+            `<span class="switch">` +
+            `<input type="checkbox" name="perm_${k}" ${permissoes[k] !== false ? 'checked' : ''}>` +
+            `<span class="slider">` +
+            `</span>` +
+            `</span>` +
+            `</label>`)).join('')}` +
+        `<div class="permission-row">` +
+        `<span>${icon('administracao')} Administração</span>` +
+        `${pill(perfil === 'Administrador' ? 'Ativo' : 'Inativo')}</div>` +
+        `</div>`);
+    const resumoAcessos = u => chaves.filter(k => allowed(u, k)).map(k => modules.find(m => m[0] === k)[1]).join(', ') || 'Nenhum módulo operacional';
+    const campos = (u = null) => field('Nome', input('nome', 'text', `required maxlength="80" value="${esc(u?.nome || '')}"`))
+        + field('Login', input('login', 'text', `required maxlength="40" value="${esc(u?.login || '')}"`))
+        + field(u ? 'Nova senha (opcional)' : 'Senha inicial de demonstração', input('senha', 'password', `${u ? '' : 'required'} minlength="4" maxlength="64" autocomplete="new-password"`))
+        + field('Perfil de acesso', `<select name="perfil">${perfis.map(p => `<option ${p === u?.perfil ? 'selected' : ''}>${p}</option>`).join('')}</select>`)
+        + (`<label class="row full">` +
+            `<input name="ativo" type="checkbox" ${u?.ativo === false ? '' : 'checked'}> Conta ativa</label>` +
+            `<div class="full" id="acesso">${acessos(u?.perfil || 'Gerente', u?.permissoes)}</div>`);
+
+    // Sincroniza os campos de acesso quando o perfil é alterado.
+    function bindPerfil(f) {
+        f.elements.perfil.onchange = () => {
+            const perms = Object.fromEntries(chaves.map(k => [k, f.elements['perm_' + k].checked]));
+            $('#acesso', f).innerHTML = acessos(f.elements.perfil.value, perms);
+        };
+    }
+
+    // Valida e salva o cadastro do usuário.
+    function salvarUsuario(v, form, u = null) {
+        const nome = requireText(v.nome, 'o nome'), login = requireText(v.login, 'o login');
+        if (!perfis.includes(v.perfil))
+            throw Error('Perfil inválido.');
+        Dados.atualizar(d => {
+            if (d.usuarios.some(x => x.login.toLowerCase() === login.toLowerCase() && x.id !== u?.id))
+                throw Error('Já existe uma conta com esse login.');
+            const ativo = form.elements.ativo.checked;
+            const permissoes = Object.fromEntries(chaves.map(k => [k, form.elements['perm_' + k].checked]));
+            if (u && u.id === session()?.id && (!ativo || v.perfil !== 'Administrador'))
+                throw Error('Não é possível desativar ou remover o perfil administrativo da própria sessão.');
+            if (u) {
+                const target = d.usuarios.find(x => x.id === u.id);
+                Object.assign(target, {
+                    nome,
+                    login,
+                    perfil: v.perfil,
+                    ativo,
+                    permissoes
+                });
+                if (v.senha)
+                    target.senha = v.senha;
+            }
+            else
+                d.usuarios.push({
+                    id: Dados.id(),
+                    nome,
+                    login,
+                    senha: requireText(v.senha, 'a senha'),
+                    perfil: v.perfil,
+                    ativo,
+                    permissoes
+                });
+        });
+    }
+
+    // Monta a aba administrativa selecionada e configura seus controles.
+    function render(i) {
+        metricas();
+        const root = $('#painel'), d = Dados.ler();
+        if (i === 0) {
+            root.innerHTML = card('Gerenciar usuários e permissões', 'Edite contas e personalize as permissões de cada usuário.', tabela(['Nome', 'Login', 'Perfil', 'Situação', 'Módulos permitidos', 'Ações'], d.usuarios.map(u => [
+                esc(u.nome),
+                esc(u.login),
+                esc(u.perfil),
+                pill(u.ativo ? 'Ativo' : 'Inativo'),
+                esc(resumoAcessos(u)),
+                btn('Editar / permissões', 'small', `type="button" data-edit="${esc(u.id)}"`)
+            ]))
+                + `<p class="muted" style="margin-top:12px">Administração é exclusiva de administradores. As permissões são simuladas neste navegador.</p>`);
+            root.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => {
+                const u = Dados.ler().usuarios.find(x => x.id === b.dataset.edit);
+                const dlg = modal('Editar usuário', `<form id="editar" class="form-grid">${campos(u)}<div class="actions full">${btn('Salvar alterações')}</div></form>`);
+                const f = $('#editar', dlg);
+                bindPerfil(f);
+                handle(f, (v, form) => {
+                    salvarUsuario(v, form, u);
+                    dlg.close();
+                    if (u.id === session()?.id) {
+                        location.reload();
+                        return;
+                    }
+                    tabsUI.open(0);
+                    feedback('Usuário atualizado.');
+                });
+            });
+        }
+        else if (i === 1) {
+            root.innerHTML = card('Cadastrar usuários', 'Defina credenciais iniciais, perfil e ativação da conta.', (`<form class="form-grid" id="cadastro">${campos()}<div class="note full">As credenciais são fictícias e ficam armazenadas neste navegador. Não use senhas reais.</div>` +
+                `<div class="actions full">${btn('Cadastrar usuário')}</div>` +
+                `</form>`));
+            const f = $('#cadastro');
+            bindPerfil(f);
+            handle(f, (v, form) => {
+                salvarUsuario(v, form);
+                tabsUI.open(0);
+                feedback('Usuário cadastrado.');
+            });
+        }
+        else if (i === 3) {
+            root.innerHTML = card('Backup e restauração', 'Exporte os registros locais ou restaure um backup validado.', (`<div class="note">O backup contém inclusive credenciais fictícias. Não use dados reais.</div>` +
+                `<div class="actions">` +
+                `${btn('Exportar backup JSON', 'primary', 'type="button" id="backup"')}</div>` +
+                `<form id="importar" class="section-gap">` +
+                `${field('Arquivo de backup', input('arquivo', 'file', 'accept=".json,application/json" required'))}${btn('Validar e importar', 'danger')}` +
+                `</form>`));
+            $('#backup').onclick = () => {
+                const data = Dados.ler();
+                const b = new Blob([JSON.stringify({ versao: 4, emitido: Dados.agora(), dados: data }, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(b), a = document.createElement('a');
+                a.href = url;
+                a.download = 'gato-preto-backup-' + Dados.dia() + '.json';
+                a.click();
+                setTimeout(() => URL.revokeObjectURL(url), 1000);
+                feedback('Backup exportado.');
+            };
+            $('#importar').onsubmit = async (e) => {
+                e.preventDefault();
+                try {
+                    const file = e.target.elements.arquivo.files[0];
+                    if (!file || file.size > 5000000)
+                        throw Error('Selecione um JSON de até 5 MB.');
+                    const obj = JSON.parse(await file.text());
+                    const valid = Dados.validar(obj.dados || obj);
+                    confirmUI('Restaurar backup', `Backup de ${obj.emitido ? horaBR(obj.emitido) : 'data não informada'}. Os registros locais serão substituídos e a sessão encerrada.`, () => {
+                        Dados.permissao(Dados.ler(), 'administracao');
+                        Dados.salvar(valid);
+                        sair();
+                    });
+                }
+                catch (e) {
+                    feedback(e.message, true);
+                }
+            };
+        }
+        else if (i === 4) {
+            root.innerHTML = card('Histórico de atividades', 'Consulte ações, responsáveis, módulo e horário.', (`<form id="log-filtro" class="filters">` +
+                `${field('Usuário', input('usuario', 'search', 'placeholder="Nome"'))}${field('Módulo', select('modulo', opcoes(modules.slice(1).map(m => ({ value: m[0], label: m[1] })), 'Todos')))}` +
+                `${dateFields()}${campoOrdem()}</form>` +
+                `<div id="log-lista">` +
+                `</div>`));
+            const f = $('#log-filtro');
+            listenFilters(f, () => {
+                const v = Object.fromEntries(new FormData(f));
+                const logs = ordenarCronologico(Dados.ler().atividades.map((a, j) => ({ ...a, id: a.id || 'atividade-legada-' + j })).filter(a => (!v.usuario || a.usuario.toLowerCase().includes(v.usuario.toLowerCase())) && (!v.modulo || a.modulo === v.modulo)
+                    && periodo(dataLocalInstante(a.data), v.de, v.ate)), v.ordem, a => a.data);
+                $('#log-lista').innerHTML = tabela(['Data e hora', 'Responsável', 'Módulo', 'Atividade'], logs.map(a => [celulaCronologica(a.data), esc(a.usuario), esc(a.modulo), esc(a.acao)]), logs.map(a => a.id));
+            });
+            $('#log-lista').addEventListener('table-sorted', e => {
+                if (e.detail.chronological)
+                    f.elements.ordem.value = e.detail.asc ? 'antigos' : 'recentes';
+            });
+        }
+        else {
+            root.innerHTML = card('Configurar sistema', 'Atualize os dados do café, as formas de pagamento e os parâmetros gerais.', (`<form class="form-grid" id="config">` +
+                `${field('Nome do estabelecimento', input('nome', 'text', `required maxlength="100" value="${esc(d.config.nome)}"`), true)}${field('Endereço', input('endereco', 'text', `required maxlength="200" value="${esc(d.config.endereco)}"`), true)}` +
+                `${field('Formas de pagamento (separadas por vírgula)', input('formas', 'text', `required maxlength="200" value="${esc(d.config.formas.join(', '))}"`), true)}` +
+                `${field('Moeda', '<input value="BRL — Real brasileiro" readonly>')}${field('Observação geral', input('observacao', 'text', `maxlength="200" value="${esc(d.config.observacao)}"`))}` +
+                `<div class="actions full">${btn('Salvar configurações')}</div>` +
+                `</form>`))
+                + card('Dados de demonstração', 'Reinicie o protótipo antes de uma apresentação, se necessário.', (`<p class="muted">Esta ação substitui todos os dados locais pelos registros iniciais e encerra a sessão.</p>` +
+                    `<div class="actions" style="margin-top:12px">` +
+                    `${btn('Restaurar dados de demonstração', 'danger', 'type="button" id="reset"')}</div>`));
+            handle($('#config'), v => {
+                const formas = [...new Set(v.formas.split(',').map(s => s.trim()).filter(Boolean))];
+                if (!formas.length)
+                    throw Error('Informe ao menos uma forma de pagamento.');
+                Dados.atualizar(d => Object.assign(d.config, {
+                    nome: requireText(v.nome, 'o nome'),
+                    endereco: requireText(v.endereco, 'o endereço'),
+                    formas,
+                    observacao: v.observacao.trim()
+                }));
+                $('.sidebar .brand strong').textContent = Dados.ler().config.nome;
+                document.title = 'Administração | ' + Dados.ler().config.nome;
+                feedback('Configurações salvas.');
+            });
+            $('#reset').onclick = () => {
+                confirmUI('Restaurar demonstração', 'Todos os registros locais serão substituídos pela base fictícia V4.2.1. Se quiser preservá-los, cancele e exporte um backup na aba Backup e restauração.', () => {
+                    Dados.permissao(Dados.ler(), 'administracao');
+                    Dados.restaurar();
+                    sair();
+                });
+            };
+        }
+    }
+    const tabsUI = abas(tabs, render);
 }

@@ -1,140 +1,1644 @@
+// Funções compartilhadas pelas páginas: formatação, componentes HTML, filtros, tabelas, gráficos, sessão e navegação responsiva. O símbolo $ é um atalho para querySelector.
+
 /* Componentes e utilitários compartilhados. A autenticação é apenas demonstrativa. */
-const $ = (s,root=document) => root.querySelector(s);
-const esc = value => String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const dinheiro = n => Number(n).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
-const numero = n => Number(n).toLocaleString('pt-BR',{maximumFractionDigits:3});
-const dataBR = s => s ? String(s).slice(0,10).split('-').reverse().join('/') : '—';
-const horaBR = s => {const d=new Date(s);return Number.isNaN(d.getTime())?'—':d.toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'});};
-const soma = (arr,fn=x=>x.valor) => Math.round(arr.reduce((s,x)=>s+Number(fn(x)),0)*100)/100;
-const periodo = (d,de,ate) => (!de||d>=de)&&(!ate||d<=ate);
-const opcoes = (values,all=null) => (all===null?'':`<option value="">${esc(all)}</option>`)+values.map(v=>typeof v==='object'?`<option value="${esc(v.value)}">${esc(v.label)}</option>`:`<option>${esc(v)}</option>`).join('');
-const field = (label,html,full=false) => `<label class="field${full?' full':''}"><span>${label}</span>${html}</label>`;
-const input = (name,type='text',extras='') => type==='date'?dateInput(name,extras):`<input name="${name}" type="${type}" ${extras}>`;
-function dateInput(name,extras=''){
- const initial=(extras.match(/value="([^"]*)"/)||[])[1]||'', required=/\brequired\b/.test(extras);
- return `<span class="date-control"><input class="date-text" type="text" inputmode="numeric" autocomplete="off" placeholder="Selecionar data" maxlength="10" ${required?'required':''} value="${esc(initial?dataBR(initial):'')}" aria-label="${name==='de'?'Data inicial':name==='ate'?'Data final':'Data'}"><input type="hidden" name="${name}" value="${esc(initial)}"><span class="calendar-trigger" title="Abrir calendário"><svg viewBox="0 0 24 24" aria-hidden="true" class="icon"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 10h18"/></svg><input type="date" class="date-picker" value="${esc(initial)}" aria-label="Abrir calendário"></span></span>`;
+
+// Seleciona um elemento do DOM; o segundo argumento limita a busca a um contêiner.
+const $ = (s, root = document) => root.querySelector(s);
+
+// Escapa caracteres especiais antes de inserir textos em HTML.
+const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+}[c]));
+const dinheiro = n => Number(n).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const numero = n => Number(n).toLocaleString('pt-BR', { maximumFractionDigits: 3 });
+const dataBR = s => s ? String(s).slice(0, 10).split('-').reverse().join('/') : '—';
+// Instantes originais, com precisão de milissegundos e suporte a fusos ISO.
+
+// Converte uma data com horário em milissegundos; retorna null se o horário não for conhecido.
+const instanteCronologico = s => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(s) && Number.isFinite(Date.parse(s)) ? Date.parse(s) : null;
+const desempateCronologico = (a, b) => String(a ?? '').localeCompare(String(b ?? ''), 'pt-BR', { numeric: true }) || (String(a ?? '') < String(b ?? '') ? -1 : String(a ?? '') > String(b ?? '') ? 1 : 0);
+
+// Ordena uma cópia da lista pelo instante real, com desempate estável por identificador.
+const ordenarCronologico = (xs, ordem = 'recentes', get = x => x.registro, key = x => x.id) => [...xs].sort((a, b) => {
+    const x = instanteCronologico(get(a)), y = instanteCronologico(get(b));
+    if (x === null || y === null)
+        return x === y ? desempateCronologico(key(a), key(b)) : x === null ? 1 : -1;
+    return (ordem === 'antigos' ? 1 : -1) * (x - y) || desempateCronologico(key(a), key(b));
+});
+
+// Exibe data e hora e inclui o instante numérico usado na ordenação das tabelas.
+const celulaCronologica = (s) => {
+    const t = instanteCronologico(s);
+    return t === null
+        ? '<span data-sort-timestamp="">Horário não informado</span>'
+        : `<time data-sort-timestamp="${t}" datetime="${esc(s)}">${esc(new Date(t).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'medium' }))}</time>`;
+};
+const campoOrdem = () => field('Ordenar por', select('ordem', opcoes([{ value: 'recentes', label: 'Mais recentes primeiro' }, { value: 'antigos', label: 'Mais antigos primeiro' }])));
+const dataLocalInstante = s => {
+    const t = instanteCronologico(s);
+    if (t === null)
+        return String(s || '').slice(0, 10);
+    const d = new Date(t);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+const horaBR = s => {
+    const d = new Date(s);
+    return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+};
+const soma = (arr, fn = x => x.valor) => Math.round(arr.reduce((s, x) => s + Number(fn(x)), 0) * 100) / 100;
+
+// Padroniza maiúsculas e acentos para facilitar pesquisas.
+const normalizarBusca = s => String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+const itensTexto = (p, max = Infinity) => {
+    const itens = p?.itens || [];
+    return itens.slice(0, max).map(i => `${numero(i.qtd)}× ${i.nome || 'Nome não registrado'}`).join(' · ') + (itens.length > max ? ` · +${itens.length - max} produtos` : '');
+};
+const pedidoLabel = p => `#${p.numero} · ${itensTexto(p, 2)} · ${p.status} · ${dinheiro(p.total)}`;
+const pedidoResumo = p => {
+    const text = esc(itensTexto(p, 2));
+    return p.itens.length > 2 ? `<details class="record-items"><summary>${text}</summary><div>${esc(itensTexto(p))}</div></details>` : text;
+};
+const pedidoBusca = (p, q) => normalizarBusca('#' + p.numero + ' ' + itensTexto(p)).includes(normalizarBusca(q));
+// Para estornos, descreve somente os produtos vinculados à devolução efetiva.
+const itensDaReceita = (r, p) => {
+    if (!p) return [];
+    if (!r.estornoDe) {
+        // Adiantamentos preservam os itens da época; legados manuais sem fotografia não
+        // devem receber retroativamente os itens atuais após uma edição do pedido.
+        if (r.itensPedido) return r.itensPedido;
+        if (r.origem === 'Manual' && p.eventos?.some(e => e.texto === 'Itens e total alterados')) return [];
+        return p.itens;
+    }
+    const dev = (p.devolucoes || []).find(x => x.id === r.operacaoId || x.estornos?.includes(r.id));
+    if (!dev) return [];
+    return Object.entries(dev.quantidades).map(([id, qtd]) => ({ qtd, nome: p.itens.find(i => i.produtoId === id)?.nome || 'Nome não registrado' }));
+};
+const receitaProdutos = (r, d = Dados.ler(), max = Infinity) => {
+    const p = allowed(session(), 'pedidos') && r.pedidoId ? d.pedidos.find(p => p.id === r.pedidoId) : null;
+    return itensTexto({ itens: itensDaReceita(r, p) }, max);
+};
+const receitaLabel = (r, d = Dados.ler(), max = Infinity) => {
+    const p = allowed(session(), 'pedidos') && r.pedidoId ? d.pedidos.find(p => p.id === r.pedidoId) : null;
+    const produtos = receitaProdutos(r, d, max);
+    return r.descricao + (p && !r.descricao.includes('#' + p.numero) ? ' · #' + p.numero : '') + (produtos ? ' · ' + produtos : r.estornoDe && p ? ' · Estorno financeiro (sem item vinculado)' : '');
+};
+const receitaResumo = (r, d = Dados.ler()) => {
+    const p = allowed(session(), 'pedidos') && r.pedidoId ? d.pedidos.find(p => p.id === r.pedidoId) : null;
+    const itens = itensDaReceita(r, p);
+    return `<div class="record-description"><span>${esc(r.descricao + (p && !r.descricao.includes('#' + p.numero) ? ' · #' + p.numero : ''))}</span>`
+        + (itens.length ? '<div class="record-products">' + pedidoResumo({ itens }) + '</div>' : p && r.estornoDe ? '<small>Estorno financeiro (sem item vinculado)</small>' : '') + '</div>';
+};
+const custoLabel = x => x == null ? 'Não informado' : dinheiro(x);
+const periodo = (d, de, ate) => (!de || d >= de) && (!ate || d <= ate);
+const opcoes = (values, all = null) => (all === null ? '' : `<option value="">${esc(all)}</option>`)
+    + values.map(v => typeof v === 'object' ? `<option value="${esc(v.value)}">${esc(v.label)}</option>` : `<option>${esc(v)}</option>`).join('');
+const field = (label, html, full = false) => `<label class="field${full ? ' full' : ''}"><span>${label}</span>${html}</label>`;
+const input = (name, type = 'text', extras = '') => type === 'date' ? dateInput(name, extras) : `<input name="${esc(name)}" type="${esc(type)}" ${extras}>`;
+
+// Monta o controle de data com apresentação brasileira e valor ISO interno.
+function dateInput(name, extras = '') {
+    const initial = (extras.match(/value="([^"]*)"/) || [])[1] || '', required = /\brequired\b/.test(extras);
+    return (`<span class="date-control">` +
+        `<input class="date-text" type="text" inputmode="numeric" autocomplete="off" placeholder="Selecionar data" maxlength="10" ${required ? 'required' : ''} value="${esc(initial ? dataBR(initial) : '')}" aria-label="${name === 'de' ? 'Data inicial' : name === 'ate' ? 'Data final' : 'Data'}">` +
+        `<input type="hidden" name="${name}" value="${esc(initial)}">` +
+        `<span class="calendar-trigger" title="Abrir calendário">` +
+        `<svg viewBox="0 0 24 24" aria-hidden="true" class="icon">` +
+        `<rect x="3" y="5" width="18" height="16" rx="2"/>` +
+        `<path d="M7 3v4m10-4v4M3 10h18"/>` +
+        `</svg>` +
+        `<input type="date" class="date-picker" value="${esc(initial)}" aria-label="Abrir calendário">` +
+        `</span>` +
+        `</span>`);
 }
-function syncDate(el){const box=el.closest('.date-control'),txt=$('.date-text',box),hidden=$('input[type=hidden]',box),picker=$('.date-picker',box);if(el===picker){txt.value=picker.value?dataBR(picker.value):'';}
- else {const digits=txt.value.replace(/\D/g,'').slice(0,8);txt.value=digits.replace(/^(\d{2})(\d)/,'$1/$2').replace(/^(\d{2}\/\d{2})(\d)/,'$1/$2');}
- const m=txt.value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/),iso=m?`${m[3]}-${m[2]}-${m[1]}`:'',d=new Date(iso+'T12:00:00Z'),valid=!!m&&Number(m[3])>=1900&&Number(m[3])<=9999&&!isNaN(d)&&d.toISOString().slice(0,10)===iso;
- hidden.value=valid?iso:'';if(el!==picker)picker.value=hidden.value;txt.setCustomValidity(txt.value&&!valid?'Digite uma data válida (dia, mês e ano).':'');
+
+// Sincroniza a data digitada e a selecionada no calendário.
+function syncDate(el) {
+    const box = el.closest('.date-control'), txt = $('.date-text', box), hidden = $('input[type=hidden]', box), picker = $('.date-picker', box);
+    if (el === picker) {
+        txt.value = picker.value ? dataBR(picker.value) : '';
+    }
+    else {
+        const digits = txt.value.replace(/\D/g, '').slice(0, 8);
+        txt.value = digits.replace(/^(\d{2})(\d)/, '$1/$2').replace(/^(\d{2}\/\d{2})(\d)/, '$1/$2');
+    }
+    const m = txt.value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/), iso = m ? `${m[3]}-${m[2]}-${m[1]}` : '', d = new Date(iso + 'T12:00:00Z'), valid = !!m && Number(m[3]) >= 1900 && Number(m[3]) <= 9999 && !isNaN(d) && d.toISOString().slice(0, 10) === iso;
+    hidden.value = valid ? iso : '';
+    if (el !== picker)
+        picker.value = hidden.value;
+    txt.setCustomValidity(txt.value && !valid ? 'Digite uma data válida (dia, mês e ano).' : '');
 }
-document.addEventListener('input',e=>{if(e.target.matches('.date-text,.date-picker'))syncDate(e.target);},true);
-document.addEventListener('change',e=>{if(e.target.matches('.date-picker')){syncDate(e.target);$('.date-text',e.target.closest('.date-control')).dispatchEvent(new Event('input',{bubbles:true}));}},true);
-const select = (name,opts,extras='') => `<select name="${name}" ${extras}>${opts}</select>`;
-const btn = (label,cls='primary',attrs='') => `<button class="btn ${cls}" ${attrs}>${label}</button>`;
-const pill = s => `<span class="pill ${['Concluído','Pago','Ativo','Normal','Entrada'].includes(s)?'green':['Cancelado','Inativo','Crítico','Saída'].includes(s)?'red':['Pendente','Em preparo','Pronto'].includes(s)?'amber':''}">${esc(s)}</span>`;
-const tabela = (headers,rows,recordIds=[]) => `<div class="table-wrap" tabindex="0" role="region" aria-label="Tabela de dados"><table><thead><tr>${headers.map(x=>`<th scope="col">${esc(x)}</th>`).join('')}</tr></thead><tbody>${rows.length?rows.map((row,j)=>`<tr${recordIds[j]!=null?` data-record-id="${esc(recordIds[j])}"`:""}>${row.map((c,i)=>`<td data-label="${esc(headers[i])}">${c}</td>`).join('')}</tr>`).join(''):`<tr><td class="empty" colspan="${headers.length}">Nenhum registro encontrado.</td></tr>`}</tbody></table></div>`;
-const paths={dashboard:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',pedidos:'<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V2h6v2M9 9h6M9 13h6M9 17h4"/>',estoque:'<path d="M3 7l9-4 9 4-9 4-9-4v10l9 4 9-4V7M12 11v10M7.5 5l9 4"/>',financeiro:'<rect x="3" y="5" width="18" height="15" rx="2"/><path d="M3 9h18M15 13h6M15 16h2"/>',administracao:'<circle cx="12" cy="8" r="3"/><path d="M5 21v-3a7 7 0 0 1 14 0v3M3 9h2M19 9h2"/>',moon:'<path d="M20 15A9 9 0 0 1 9 4a9 9 0 1 0 11 11Z"/>',sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/>',logout:'<path d="M10 17l5-5-5-5M15 12H3M13 3h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6"/>',arrow:'<path d="M4 12h16m-6-6 6 6-6 6"/>',alert:'<path d="M12 3 2 20h20L12 3Z M12 9v4M12 16v1"/>',check:'<path d="m5 12 4 4L19 6"/>',coffee:'<path d="M4 8h13v6a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V8Zm13 1h2a3 3 0 1 1 0 6h-2M2 22h20M8 2v3M12 2v3"/>'};
-const icon = name => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${paths[name]||paths.dashboard}</svg>`;
-const stat = (title,value,detail,ic='dashboard') => `<article class="card stat"><div class="stat-top">${esc(title)}<span class="stat-icon">${icon(ic)}</span></div><strong>${esc(value)}</strong><small>${esc(detail)}</small></article>`;
-const card = (title,subtitle,body) => `<section class="card"><div class="card-head"><div><h2>${esc(title)}</h2><p class="muted">${esc(subtitle)}</p></div></div>${body}</section>`;
-const feedback = (msg,bad=false) => {let el=$('#toast');if(!el){el=document.createElement('div');el.id='toast';el.setAttribute('role','status');document.body.append(el);}el.className='toast'+(bad?' bad':'');el.textContent=msg;el.hidden=false;clearTimeout(feedback.timer);feedback.timer=setTimeout(()=>el.hidden=true,4500);};
-const handle = (form,fn) => form.addEventListener('submit',e=>{e.preventDefault();try{fn(Object.fromEntries(new FormData(form)),form);}catch(err){feedback(err.message||'Não foi possível concluir.',true);}});
-const requireText = (v,label) => {if(!String(v??'').trim())throw Error(`Informe ${label}.`);return String(v).trim();};
-const positive = (v,label,zero=false) => {const n=Number(v);if(v===''||!Number.isFinite(n)||(zero?n<0:n<=0))throw Error(`Informe ${label} válido.`);return n;};
-const allowed=(u,key)=>!!u&&(key==='dashboard'||(key==='administracao'?u.perfil==='Administrador':(u.permissoes?.[key]!==false)));
-const session = () => {const id=localStorage.getItem('gato-session');return Dados.ler().usuarios.find(u=>u.id===id&&u.ativo);};
-const theme = () => {const t=localStorage.getItem('gato-theme')==='dark'?'dark':'light';document.documentElement.dataset.theme=t;document.querySelectorAll('[data-theme-button]').forEach(b=>{b.innerHTML=icon(t==='dark'?'sun':'moon')+(t==='dark'?'Modo claro':'Modo escuro');b.setAttribute('aria-pressed',String(t==='dark'));});};
-const toggleTheme = () => {localStorage.setItem('gato-theme',document.documentElement.dataset.theme==='dark'?'light':'dark');theme();};
+document.addEventListener('input', e => {
+    if (e.target.matches('.date-text,.date-picker'))
+        syncDate(e.target);
+}, true);
+document.addEventListener('change', e => {
+    if (e.target.matches('.date-picker')) {
+        syncDate(e.target);
+        $('.date-text', e.target.closest('.date-control')).dispatchEvent(new Event('input', { bubbles: true }));
+    }
+}, true);
+const select = (name, opts, extras = '') => `<select name="${esc(name)}" ${extras}>${opts}</select>`;
+const btn = (label, cls = 'primary', attrs = '') => `<button class="btn ${cls}" ${attrs}>${label}</button>`;
+const pill = s => (`<span class="pill ${['Concluído', 'Pago', 'Ativo', 'Normal', 'Entrada'].includes(s)
+    ? 'green'
+    : ['Cancelado', 'Inativo', 'Crítico', 'Estoque baixo', 'Esgotado', 'Saída'].includes(s) ? 'red' : ['Pendente', 'Em preparo', 'Pronto', 'Despesa pendente', 'Registro futuro'].includes(s) ? 'amber' : ''}">` +
+    `${esc(s)}</span>`);
+// V4.2.3: a célula tem uma única área de conteúdo, inclusive nas listas mobile.
+const tableKind = label => /^(Data|Data e hora|Data de registro|Registro \/ quitação)$/.test(label)
+    ? 'date'
+    : /^(Preço|Preço de venda|Quantidade|Qtd\.|Unitário|Subtotal|Total|Valor|Saldo|Saldo anterior|Saldo atual|Saldo diário|Saldo acumulado|Mínimo|Entradas|Saídas|Custo registrado)$/.test(label)
+        ? 'number'
+        : /^(Responsável|Login|Pedido|Unidade|Tipo|Status|Situação|Perfil)$/.test(label)
+            ? 'short'
+            : /^(Motivo \/ origem|Origem|Descrição|Atividade|Evento|Produtos)$/.test(label) ? 'description' : 'text';
+const cellDetail = (primary, details = []) => (`<span class="cell-primary">${esc(primary)}</span>` +
+    `${details.length
+        ? (`<div class="cell-meta">` +
+            `${details.map(({ text, tag }) => `<span class="${tag ? 'cell-tag' : 'cell-secondary'}">${esc(text)}</span>`).join(' <span class="cell-separator" aria-hidden="true">·</span> ')}` +
+            `</div>`)
+        : ''}`);
+
+// Gera a tabela e seus atributos de identificação, usados por filtros e registros responsivos.
+const tabela = (headers, rows, recordIds = []) => (`<div class="table-wrap" tabindex="0" role="region" aria-label="Tabela de dados">` +
+    `<table>` +
+    `<thead>` +
+    `<tr>` +
+    `${headers.map(x => `<th scope="col" data-kind="${tableKind(x)}">${esc(x)}</th>`).join('')}</tr>` +
+    `</thead>` +
+    `<tbody>` +
+    `${rows.length
+        ? rows.map((row, j) => (`<tr${recordIds[j] != null ? ` data-record-id="${esc(recordIds[j])}"` : ""}>` +
+            `${row.map((c, i) => `<td data-label="${esc(headers[i])}" data-kind="${tableKind(headers[i])}"><div class="cell-content">${c}</div></td>`).join('')}` +
+            `</tr>`)).join('')
+        : `<tr><td class="empty" colspan="${headers.length}">Nenhum registro encontrado.</td></tr>`}` +
+    `</tbody>` +
+    `</table>` +
+    `</div>`);
+const paths = {
+    dashboard: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
+    pedidos: '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V2h6v2M9 9h6M9 13h6M9 17h4"/>',
+    estoque: '<path d="M3 7l9-4 9 4-9 4-9-4v10l9 4 9-4V7M12 11v10M7.5 5l9 4"/>',
+    financeiro: '<rect x="3" y="5" width="18" height="15" rx="2"/><path d="M3 9h18M15 13h6M15 16h2"/>',
+    administracao: '<circle cx="12" cy="8" r="3"/><path d="M5 21v-3a7 7 0 0 1 14 0v3M3 9h2M19 9h2"/>',
+    moon: '<path d="M20 15A9 9 0 0 1 9 4a9 9 0 1 0 11 11Z"/>',
+    sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/>',
+    logout: '<path d="M10 17l5-5-5-5M15 12H3M13 3h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6"/>',
+    arrow: '<path d="M4 12h16m-6-6 6 6-6 6"/>',
+    alert: '<path d="M12 3 2 20h20L12 3Z M12 9v4M12 16v1"/>',
+    check: '<path d="m5 12 4 4L19 6"/>',
+    coffee: '<path d="M4 8h13v6a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V8Zm13 1h2a3 3 0 1 1 0 6h-2M2 22h20M8 2v3M12 2v3"/>'
+};
+const icon = name => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${paths[name] || paths.dashboard}</svg>`;
+// Explicações compartilhadas: o contexto e os operandos são fornecidos pelo cálculo que renderiza o cartão.
+const percentual = n => Number(n).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
+const escopoPeriodo = (de = '', ate = '') => de || ate ? `De ${de ? dataBR(de) : 'início dos registros'} até ${ate ? dataBR(ate) : 'último registro'}.` : 'Todo o histórico.';
+
+// Textos e fórmulas dos indicadores apresentados ao usuário.
+const regrasIndicadores = {
+    'Pedidos registrados': ["Quantos pedidos foram cadastrados, mesmo os cancelados.", "Conte os pedidos pela data em que foram registrados."],
+    'Em andamento': ["Quantos pedidos ainda precisam ser atendidos.", "Some os pedidos pendentes, em preparo e prontos."],
+    'Concluídos': ["Quantos pedidos já foram finalizados.", "Conte os pedidos marcados como Concluído."],
+    'Cancelados': ["Quantos pedidos foram cancelados.", "Conte os pedidos marcados como Cancelado."],
+    'Valor dos pedidos': ["Quanto valem os pedidos que não foram cancelados. Não é o dinheiro recebido.", "Some o valor total desses pedidos."],
+    'Ticket médio': ["Quanto vale, em média, cada pedido finalizado. Ajuda a entender o gasto médio dos clientes.", "Total dos pedidos concluídos ÷ quantidade desses pedidos. Não desconta estornos posteriores. Se não houver pedidos, mostra zero."],
+    'Produtos cadastrados': ["Quantos produtos existem no catálogo, mesmo os inativos.", "Conte todos os produtos cadastrados."],
+    'Produtos ativos': ["Quantos produtos estão habilitados para novos pedidos.", "Conte os produtos que não foram inativados."],
+    'Estoque baixo': ["Quantos produtos monitorados precisam de reposição. Exemplo: restam 5 fatias de bolo e o mínimo é 8.", "Conte os produtos ativos, com monitoramento ligado, cuja quantidade está abaixo do mínimo. Esgotados sem mínimo são avisados separadamente."],
+    'Movimentações': ["Quantas vezes o estoque foi movimentado. Não é o número de unidades movimentadas.", "Conte os registros de entrada, saída e ajuste."],
+    'Categorias': ["Quantos grupos de produtos existem no catálogo.", "Conte os nomes diferentes de categorias, incluindo produtos inativos."],
+    'Receitas líquidas': ["Quanto entrou em dinheiro após descontar os valores estornados. Pode incluir pagamentos antecipados e recebimentos avulsos.", "Recebimentos − estornos."],
+    'Recebimentos': ["Quanto foi recebido após descontar estornos.", "Recebimentos − estornos no período."],
+    'Receitas brutas': ["Quanto foi recebido antes de devolver valores aos clientes.", "Some os recebimentos positivos."],
+    'Faturamento recebido bruto': ["Quanto foi recebido antes dos estornos, mesmo em pedidos ainda não concluídos.", "Some os recebimentos positivos."],
+    'Estornos': ["Quanto foi devolvido ou revertido nos recebimentos.", "Some os valores estornados, sem o sinal de menos."],
+    'Despesas pagas': ["Quanto foi pago em despesas, descontando reembolsos e correções registradas.", "Some as despesas pagas, incluindo os ajustes de valor."],
+    'Despesas pagas líquidas': ["Quanto foi pago em despesas, descontando reembolsos e correções registradas.", "Some as despesas pagas, incluindo os ajustes de valor."],
+    'Despesas pendentes': ["Quanto ainda falta pagar. Esse dinheiro ainda não saiu do caixa.", "Some as despesas marcadas como Pendente."],
+    'Saldo de caixa': ["Quanto sobrou dos recebimentos após pagar as despesas registradas. Não é o saldo da conta bancária.", "Receitas líquidas − despesas pagas líquidas."],
+    'Saldo do período': ["Quanto entrou menos quanto saiu no período selecionado. Não inclui o saldo anterior.", "Receitas líquidas − despesas pagas líquidas."],
+    'Vendas líquidas reconhecidas': ["Quanto foi vendido em pedidos finalizados, descontando os estornos dessas vendas. Um pagamento antecipado ainda não conta como venda concluída.", "Total das vendas pela data de conclusão − estornos dessas vendas pela data do estorno."],
+    'CMV líquido de reposições': ["Quanto custaram os produtos que você vendeu. Exemplo: uma fatia de bolo que custou R$ 5 tem CMV de R$ 5, mesmo que tenha sido vendida por R$ 12.", "Some o custo das saídas de pedidos e desconte o custo dos produtos devolvidos fisicamente ao estoque, pelas datas das movimentações."],
+    'Lucro bruto estimado': ["Quanto sobrou das vendas após descontar o custo dos produtos, antes das demais despesas.", "Vendas concluídas após estornos − custo dos produtos vendidos (CMV)."],
+    'Margem bruta': ["Quanto sobra de cada R$ 100 em vendas depois de descontar o custo dos produtos. Se for negativa, o custo superou as vendas.", "(Lucro bruto ÷ vendas concluídas após estornos) × 100."],
+    'Valor atual do estoque': ["Quanto valem os produtos que você tem hoje pelo custo de aquisição, não pelo preço de venda. Inclui produtos inativos com saldo.", "Multiplique o saldo de cada produto pelo seu custo médio e some os resultados. Não depende do período."],
+    'Perdas e desperdícios': ["Quanto custaram os produtos perdidos, vencidos ou desperdiçados. Isso não representa um novo pagamento.", "Some os custos registrados dessas saídas no período."],
+    'Resultado operacional estimado': ["Quanto sobrou das vendas depois do custo dos produtos, das despesas operacionais pagas e dos desperdícios. É uma estimativa, não o lucro líquido contábil.", "Lucro bruto − perdas − despesas pagas (sem contar compras de estoque novamente)."],
+    'Margem operacional estimada': ["Quanto sobra de cada R$ 100 vendidos depois dos custos, pagamentos operacionais e perdas considerados.", "(Resultado operacional estimado ÷ vendas concluídas após estornos) × 100."],
+    'Usuários cadastrados': ["Quantas contas existem no sistema, mesmo as inativas.", "Conte todos os usuários cadastrados."],
+    'Contas ativas': ["Quantas pessoas têm acesso habilitado ao sistema.", "Conte as contas marcadas como ativas."],
+    'Administradores': ["Quantas contas têm perfil Administrador, inclusive as inativas.", "Conte os usuários com esse perfil."],
+    'Gerentes': ["Quantas contas têm perfil Gerente, mesmo as inativas. Cada gerente pode ter permissões diferentes.", "Conte os usuários com esse perfil."],
+    'Total de despesas': ["Quanto foi registrado em despesas, mesmo as que ainda não foram pagas.", "Some as despesas pagas e pendentes, incluindo os ajustes e excluindo as canceladas."],
+    'Total de entradas': ["Quanto entrou nos recebimentos que aparecem nesta consulta.", "Some os registros do tipo Entrada que atendem aos filtros."],
+    'Estornos do histórico': ["Quanto foi estornado nos recebimentos desta consulta.", "Some os valores dos registros do tipo Estorno, sem o sinal de menos."],
+    'Total de saídas lançadas': ["Quanto foi registrado em despesas e ajustes, incluindo contas ainda não pagas.", "Some as saídas e reversões de despesas que aparecem na consulta, excluindo canceladas."]
+};
+
+// Combina a explicação com o período, a memória de cálculo e os motivos de indisponibilidade.
+const explicacaoIndicador = (title, value, info = {}) => {
+    const regra = regrasIndicadores[info.key || title];
+    if (!regra)
+        throw Error('Indicador sem definição: ' + title);
+    return (`<div class="indicator-explanation">` +
+        `<div>` +
+        `<b>O que significa?</b>` +
+        `<p>${esc(regra[0])}</p>` +
+        `</div>` +
+        `<div class="indicator-rule">` +
+        `<b>Como é calculado</b>` +
+        `<p>${esc(regra[1])}</p>` +
+        `</div>` +
+        `<div class="indicator-memory">` +
+        `<b>` +
+        `${info.reason ? 'Por que está indisponível' : 'Como chegamos a esse valor'}</b>` +
+        `<p>${esc(info.reason || info.memory || ('Resultado: ' + value))}</p>` +
+        `</div>` +
+        `<p class="indicator-scope">${esc(info.scope || 'Todo o histórico, sem filtro de período.')}</p>` +
+        `${info.comparison ? `<p class="indicator-scope">${esc(info.comparison)}</p>` : ''}</div>`);
+};
+const stat = (title, value, detail, ic = 'dashboard', info = {}) => (`<details class="card stat indicator" data-indicator="${esc(title)}">` +
+    `<summary class="indicator-summary">` +
+    `<span class="stat-top">` +
+    `<span class="indicator-title">` +
+    `${esc(({
+        'CMV líquido de reposições': 'CMV — Custo dos produtos vendidos',
+        'Vendas líquidas reconhecidas': 'Vendas concluídas após estornos'
+    })[title] || title)}` +
+    `</span>` +
+    `<span class="indicator-tools">` +
+    `<span class="stat-icon" aria-hidden="true">${icon(ic)}</span>` +
+    `<svg class="indicator-arrow" viewBox="0 0 16 16" aria-hidden="true">` +
+    `<path d="m4 6 4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>` +
+    `</svg>` +
+    `</span>` +
+    `</span>` +
+    `<strong>${esc(value)}</strong>` +
+    `<small>${esc(detail)}</small>` +
+    `</summary>${explicacaoIndicador(title, value, info)}</details>`);
+
+// Atualiza os indicadores sem perder as explicações que estavam abertas.
+function renderIndicators(root, html) {
+    const opened = new Set([...root.querySelectorAll('.indicator[open]')].map(x => x.dataset.indicator));
+    root.innerHTML = html;
+    root.querySelectorAll('.indicator').forEach(x => {
+        x.open = opened.has(x.dataset.indicator);
+    });
+}
+const memoriaSoma = (arr, valor, fmt = dinheiro, fn = x => x.valor) => {
+    const valores = arr.slice(0, 5).map(x => fmt(fn(x)));
+    if (arr.length > 5)
+        valores.push(`${fmt(soma(arr.slice(5), fn))} (mais ${arr.length - 5})`);
+    return `${numero(arr.length)} lançamento(s) · ${valores.length ? valores.join(' + ') : 'sem valores'} = ${fmt(valor)}.`;
+};
+const memoriaReceitas = (rs, valor) => {
+    const br = soma(rs.filter(x => x.valor > 0)), es = -soma(rs.filter(x => x.valor < 0));
+    return `${dinheiro(br)} − ${dinheiro(es)} = ${dinheiro(valor)}.`;
+};
+const memoriaSaldo = (r, p) => `${dinheiro(r)} − ${dinheiro(p)} = ${dinheiro(r - p)}.`;
+const memoriaEstoqueBaixo = ps => ps.length
+    ? `${ps.length} produto(s): ${ps.slice(0, 5).map(p => `${p.nome} (${numero(p.saldo)} disponíveis; mínimo ${numero(p.minimo)})`).join('; ')}${ps.length > 5 ? ' e mais ' + (ps.length - 5) : ''}.`
+    : 'Nenhum produto monitorado abaixo do mínimo.';
+function custosProduto(p) {
+    const preciso = n => 'R$ ' + Number(n).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 6 });
+    const c = p.custoMedio, preco = p.preco, lucro = c == null ? null : preco - c, estoque = p.saldo === 0 ? 0 : c == null ? null : c * p.saldo, margem = lucro == null || !preco ? null : lucro / preco * 100;
+    return (`<details class="record-items product-cost-help">` +
+        `<summary>Médio: ${custoLabel(c)}</summary>` +
+        `<small>Último: ${custoLabel(p.ultimoCusto)}</small>` +
+        `<small>Estoque: ${custoLabel(estoque)}</small>` +
+        `<small>Lucro unitário: ${custoLabel(lucro)}</small>` +
+        `<small>Margem: ${margem === null ? '—' : percentual(margem)}</small>` +
+        `<div class="product-cost-formulas">` +
+        `<p>` +
+        `<b>Custo médio:</b> quanto custa, em média, cada unidade disponível. Some o valor do estoque anterior e da nova entrada e divida pela nova quantidade, quando os custos são conhecidos. Também pode ser informado com justificativa.</p>` +
+        `<p>` +
+        `<b>Último custo:</b> quanto custou cada unidade na última compra registrada.</p>` +
+        `<p>` +
+        `<b>Valor do estoque:</b> ${estoque === null ? 'custo médio não informado.' : p.saldo === 0 ? 'saldo zero = R$ 0,00.' : `${numero(p.saldo)} × ${preciso(c)} ≈ ${dinheiro(estoque)}.`}` +
+        `</p>` +
+        `<p>` +
+        `<b>Lucro unitário:</b> ${lucro === null ? 'custo médio não informado.' : `${dinheiro(preco)} − ${preciso(c)} ≈ ${dinheiro(lucro)}.`}` +
+        `</p>` +
+        `<p>` +
+        `<b>Margem:</b> ${margem === null
+            ? 'indisponível: informe o custo médio e um preço de venda maior que zero.'
+            : `(${preciso(lucro)} ÷ ${dinheiro(preco)}) × 100 ≈ ${percentual(margem)}.`}` +
+        `</p>` +
+        `<p>O sistema guarda o custo com mais precisão para evitar diferenças de arredondamento.</p>` +
+        `</div>` +
+        `</details>`);
+}
+const card = (title, subtitle, body) => `<section class="card"><div class="card-head"><div><h2>${esc(title)}</h2><p class="muted">${esc(subtitle)}</p></div></div>${body}</section>`;
+const feedback = (msg, bad = false) => {
+    let el = $('#toast');
+    if (!el) {
+        el = document.createElement('div');
+        el.id = 'toast';
+        el.setAttribute('role', 'status');
+        document.body.append(el);
+    }
+    el.className = 'toast' + (bad ? ' bad' : '');
+    el.textContent = msg;
+    el.hidden = false;
+    clearTimeout(feedback.timer);
+    feedback.timer = setTimeout(() => el.hidden = true, 4500);
+};
+
+// Intercepta o envio de formulários e apresenta erros de validação ao usuário.
+const handle = (form, fn) => form.addEventListener('submit', e => {
+    e.preventDefault();
+    try {
+        fn(Object.fromEntries(new FormData(form)), form);
+    }
+    catch (err) {
+        feedback(err.message || 'Não foi possível concluir.', true);
+    }
+});
+const requireText = (v, label) => {
+    if (!String(v ?? '').trim())
+        throw Error(`Informe ${label}.`);
+    return String(v).trim();
+};
+const positive = (v, label, zero = false) => {
+    const n = Number(v);
+    if (v === '' || !Number.isFinite(n) || (zero ? n < 0 : n <= 0))
+        throw Error(`Informe ${label} válido.`);
+    return n;
+};
+
+// Verifica acesso aos módulos conforme o perfil e as permissões locais.
+const allowed = (u, key) => !!u && (key === 'dashboard' || (key === 'administracao' ? u.perfil === 'Administrador' : (u.permissoes?.[key] !== false)));
+const session = () => {
+    const id = localStorage.getItem('gato-session');
+    return Dados.ler().usuarios.find(u => u.id === id && u.ativo);
+};
+const theme = () => {
+    const t = localStorage.getItem('gato-theme') === 'dark' ? 'dark' : 'light';
+    document.documentElement.dataset.theme = t;
+    document.querySelectorAll('[data-theme-button]').forEach(b => {
+        b.innerHTML = icon(t === 'dark' ? 'sun' : 'moon') + (t === 'dark' ? 'Modo claro' : 'Modo escuro');
+        b.setAttribute('aria-pressed', String(t === 'dark'));
+    });
+};
+const toggleTheme = () => {
+    localStorage.setItem('gato-theme', document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
+    theme();
+};
 const themeBtn = () => `<button type="button" class="btn small" data-theme-button aria-label="Alternar modo claro e escuro"></button>`;
-const modules=[['dashboard','Visão geral'],['pedidos','Pedidos'],['estoque','Estoque'],['financeiro','Financeiro'],['administracao','Administração']];
-const descriptions={dashboard:['Visão geral','Acompanhe a operação e os indicadores do seu café.'],pedidos:['Pedidos','Registre, acompanhe e consulte os pedidos do estabelecimento.'],estoque:['Estoque de produtos','Controle produtos, movimentações e necessidades de reposição.'],financeiro:['Financeiro','Acompanhe recebimentos, despesas e o fluxo de caixa.'],administracao:['Administração','Gerencie usuários, permissões e configurações do estabelecimento.']};
-const sair=()=>{localStorage.removeItem('gato-session');location.href='../index.html';};
-function iniciarPagina(page){const u=session();if(!u||!allowed(u,page)){location.replace(u?'dashboard.html':'../index.html');return false;}document.body.dataset.page=page;const d=Dados.ler();const [title,desc]=descriptions[page];document.title=`${title} | ${d.config.nome}`;$('#app').innerHTML=`<div class="app"><aside class="sidebar"><a class="brand" href="dashboard.html"><img src="../assets/logo.svg" alt=""><span><strong>${esc(d.config.nome)}</strong><small>Sistema de gestão</small></span></a><button class="btn menu-toggle" type="button" aria-expanded="false" aria-controls="nav-main">☰ Menu</button><div><div class="nav-label">GERENCIAMENTO</div><nav id="nav-main" aria-label="Menu principal">${modules.filter(m=>allowed(u,m[0])).map(([key,label])=>`<a href="${key}.html" aria-label="${label}" ${key===page?'class="active" aria-current="page"':''}>${icon(key)}<span class="nav-desktop-label">${label}</span><span class="nav-mobile-label" aria-hidden="true">${key==='dashboard'?'Início':key==='administracao'?'Admin.':label}</span></a>`).join('')}</nav></div><div class="sidebottom"><button class="btn small desktop-collapse" id="collapse-menu" type="button" aria-label="Recolher menu">☰ Recolher menu</button><small>PROJETO INTEGRADOR · ADS</small><span class="pill">Ambiente demonstrativo</span></div></aside><div class="workspace"><header class="topbar"><a class="brand mobile-brand" href="dashboard.html"><img src="../assets/logo.svg" alt=""><span><strong>${esc(d.config.nome)}</strong></span></a><div class="crumb muted">Sistema de gestão / <strong>${esc(title)}</strong></div><div class="topbar-right"><button class="btn small" id="global-search" type="button" aria-label="Buscar no sistema"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><span class="tool-label">Buscar</span></button><button class="btn small" id="notifications" type="button" aria-label="Notificações"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg><span id="notification-count" aria-hidden="true">0</span></button><button class="btn small account-toggle" type="button" id="account-toggle" aria-label="Opções da conta" aria-expanded="false" aria-controls="account-tools"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button><div class="account-tools" id="account-tools">${themeBtn()}<button class="btn small" type="button" id="fullscreen" aria-pressed="false">⛶ Tela cheia</button><div class="user"><span class="avatar">${esc(u.nome.slice(0,1).toUpperCase())}</span><span><strong>${esc(u.nome)}</strong><small>${esc(u.perfil)}</small></span></div><button class="btn small" id="sair" type="button">${icon('logout')} Sair</button></div></div></header><main class="content"><section class="hero"><div><div class="eyebrow">GESTÃO DO ESTABELECIMENTO</div><h1>${esc(title)}</h1><p>${esc(desc)}</p></div><span class="hero-icon">${icon(page)}</span></section><div id="conteudo" class="section-gap"></div><footer class="footer">O Gato Preto Café · Protótipo acadêmico · Dados fictícios, salvos neste navegador.</footer></main></div></div>`;$('#sair').onclick=sair;const account=$('#account-toggle'),accountTools=$('#account-tools');const setAccount=open=>{account.setAttribute('aria-expanded',String(open));accountTools.classList.toggle('is-open',open);};const compactHeader=matchMedia('(max-width: 1100px)');const mobileHeader=matchMedia('(max-width: 760px)');compactHeader.addEventListener('change',()=>setAccount(false));mobileHeader.addEventListener('change',()=>{if(mobileHeader.matches)document.body.classList.remove('tv-mode');syncFullscreen();});account.onclick=()=>setAccount(account.getAttribute('aria-expanded')!=='true');document.addEventListener('click',e=>{if(!e.target.closest('#account-tools,#account-toggle'))setAccount(false);});document.addEventListener('keydown',e=>{if(e.key==='Escape'&&account.getAttribute('aria-expanded')==='true'){setAccount(false);account.focus();}});$('.menu-toggle').onclick=()=>{const b=$('.menu-toggle'),open=b.getAttribute('aria-expanded')!=='true';b.setAttribute('aria-expanded',String(open));$('.sidebar').classList.toggle('menu-open',open);};$('#fullscreen').onclick=()=>{setAccount(false);toggleFullscreen();};syncFullscreen();window.addEventListener('storage',e=>{if(e.key==='gato-preto-cafe-v1'||e.key==='gato-session'){const atual=session();if(!atual||!allowed(atual,page))location.replace(atual?'dashboard.html':'../index.html');else location.reload();}if(e.key==='gato-theme')theme();});theme();initExtras(page);return true;}
+const modules = [
+    ['dashboard', 'Visão geral'],
+    ['pedidos', 'Pedidos'],
+    ['estoque', 'Estoque'],
+    ['financeiro', 'Financeiro'],
+    ['administracao', 'Administração']
+];
+const descriptions = {
+    dashboard: ['Visão geral', 'Acompanhe a operação e os indicadores do seu café.'],
+    pedidos: ['Pedidos', 'Registre, acompanhe e consulte os pedidos do estabelecimento.'],
+    estoque: ['Estoque de produtos', 'Controle produtos, movimentações e necessidades de reposição.'],
+    financeiro: ['Financeiro', 'Acompanhe recebimentos, despesas e o fluxo de caixa.'],
+    administracao: ['Administração', 'Gerencie usuários, permissões e configurações do estabelecimento.']
+};
+const sair = () => {
+    localStorage.removeItem('gato-session');
+    location.href = '../index.html';
+};
+
+// Valida a sessão e monta a estrutura de navegação da página.
+function iniciarPagina(page) {
+    const u = session();
+    if (!u || !allowed(u, page)) {
+        location.replace(u ? 'dashboard.html' : '../index.html');
+        return false;
+    }
+    document.body.dataset.page = page;
+    const d = Dados.ler();
+    const [title, desc] = descriptions[page];
+    document.title = `${title} | ${d.config.nome}`;
+    $('#app').innerHTML = (`<div class="app">` +
+        `<aside class="sidebar">` +
+        `<a class="brand" href="dashboard.html">` +
+        `<img src="../assets/logo.svg" alt="">` +
+        `<span>` +
+        `<strong>${esc(d.config.nome)}</strong>` +
+        `<small>Sistema de gestão</small>` +
+        `</span>` +
+        `</a>` +
+        `<button class="btn menu-toggle" type="button" aria-expanded="false" aria-controls="nav-main">☰ Menu</button>` +
+        `<div>` +
+        `<div class="nav-label">GERENCIAMENTO</div>` +
+        `<nav id="nav-main" aria-label="Menu principal">` +
+        `${modules.filter(m => allowed(u, m[0])).map(([key, label]) => (`<a href="${key}.html" aria-label="${label}" ${key === page ? 'class="active" aria-current="page"' : ''}>` +
+            `${icon(key)}<span class="nav-desktop-label">${label}</span>` +
+            `<span class="nav-mobile-label" aria-hidden="true">` +
+            `${key === 'dashboard' ? 'Início' : key === 'administracao' ? 'Admin.' : label}</span>` +
+            `</a>`)).join('')}` +
+        `</nav>` +
+        `</div>` +
+        `<div class="sidebottom">` +
+        `<button class="btn small desktop-collapse" id="collapse-menu" type="button" aria-label="Recolher menu">☰ Recolher menu</button>` +
+        `<small>PROJETO INTEGRADOR · ADS</small>` +
+        `<span class="pill">Ambiente demonstrativo</span>` +
+        `</div>` +
+        `</aside>` +
+        `<div class="workspace">` +
+        `<header class="topbar">` +
+        `<a class="brand mobile-brand" href="dashboard.html">` +
+        `<img src="../assets/logo.svg" alt="">` +
+        `<span>` +
+        `<strong>${esc(d.config.nome)}</strong>` +
+        `</span>` +
+        `</a>` +
+        `<div class="crumb muted">Sistema de gestão / <strong>${esc(title)}</strong>` +
+        `</div>` +
+        `<div class="topbar-right">` +
+        `<button class="btn small" id="global-search" type="button" aria-label="Buscar no sistema">` +
+        `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">` +
+        `<circle cx="10.5" cy="10.5" r="6.5"/>` +
+        `<path d="m16 16 5 5"/>` +
+        `</svg>` +
+        `<span class="tool-label">Buscar</span>` +
+        `</button>` +
+        `<button class="btn small" id="notifications" type="button" aria-label="Notificações">` +
+        `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">` +
+        `<path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/>` +
+        `</svg>` +
+        `<span id="notification-count" aria-hidden="true">0</span>` +
+        `</button>` +
+        `<button class="btn small account-toggle" type="button" id="account-toggle" aria-label="Opções da conta" aria-expanded="false" aria-controls="account-tools">` +
+        `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">` +
+        `<path d="M4 6h16M4 12h16M4 18h16"/>` +
+        `</svg>` +
+        `</button>` +
+        `<div class="account-tools" id="account-tools">${themeBtn()}<button class="btn small" type="button" id="fullscreen" aria-pressed="false">⛶ Tela cheia</button>` +
+        `<div class="user">` +
+        `<span class="avatar">${esc(u.nome.slice(0, 1).toUpperCase())}</span>` +
+        `<span>` +
+        `<strong>${esc(u.nome)}</strong>` +
+        `<small>${esc(u.perfil)}</small>` +
+        `</span>` +
+        `</div>` +
+        `<button class="btn small" id="sair" type="button">${icon('logout')} Sair</button>` +
+        `</div>` +
+        `</div>` +
+        `</header>` +
+        `<main class="content">` +
+        `<section class="hero">` +
+        `<div>` +
+        `<div class="eyebrow">GESTÃO DO ESTABELECIMENTO</div>` +
+        `<h1>${esc(title)}</h1>` +
+        `<p>${esc(desc)}</p>` +
+        `</div>` +
+        `<span class="hero-icon">${icon(page)}</span>` +
+        `</section>` +
+        `<div id="conteudo" class="section-gap">` +
+        `</div>` +
+        `<footer class="footer">O Gato Preto Café · Protótipo acadêmico · Dados fictícios, salvos neste navegador.</footer>` +
+        `</main>` +
+        `</div>` +
+        `</div>`);
+    $('#sair').onclick = sair;
+    const account = $('#account-toggle'), accountTools = $('#account-tools');
+    const setAccount = open => {
+        account.setAttribute('aria-expanded', String(open));
+        accountTools.classList.toggle('is-open', open);
+    };
+    const compactHeader = matchMedia('(max-width: 1100px)');
+    const mobileHeader = matchMedia('(max-width: 760px)');
+    compactHeader.addEventListener('change', () => setAccount(false));
+    mobileHeader.addEventListener('change', () => {
+        if (mobileHeader.matches)
+            document.body.classList.remove('tv-mode');
+        syncFullscreen();
+    });
+    account.onclick = () => setAccount(account.getAttribute('aria-expanded') !== 'true');
+    document.addEventListener('click', e => {
+        if (!e.target.closest('#account-tools,#account-toggle'))
+            setAccount(false);
+    });
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape' && account.getAttribute('aria-expanded') === 'true') {
+            setAccount(false);
+            account.focus();
+        }
+    });
+    $('.menu-toggle').onclick = () => {
+        const b = $('.menu-toggle'), open = b.getAttribute('aria-expanded') !== 'true';
+        b.setAttribute('aria-expanded', String(open));
+        $('.sidebar').classList.toggle('menu-open', open);
+    };
+    $('#fullscreen').onclick = () => {
+        setAccount(false);
+        toggleFullscreen();
+    };
+    syncFullscreen();
+    window.addEventListener('storage', e => {
+        if (e.key === 'gato-preto-cafe-v1' || e.key === 'gato-session') {
+            const atual = session();
+            if (!atual || !allowed(atual, page))
+                location.replace(atual ? 'dashboard.html' : '../index.html');
+            else
+                location.reload();
+        }
+        if (e.key === 'gato-theme')
+            theme();
+    });
+    theme();
+    initExtras(page);
+    return true;
+}
 /* V4.1: links contextuais relativos, sem alteração no armazenamento ou nas permissões. */
-function notificationURL(x){return `${x.modulo}.html?${new URLSearchParams({alerta:x.filtro,registro:x.registro})}`;}
-function notificationDestination(x){return x.modulo==='estoque'?(x.filtro==='esgotado'?'produtos esgotados':'estoque baixo'):x.modulo==='pedidos'?'pedidos · '+x.filtro.toLowerCase():'despesas pendentes';}
-function notificationContext(page){
- const q=new URLSearchParams(location.search),filter=q.get('alerta'),id=q.get('registro');
- if(!id||!filter||!allowed(session(),page))return null;
- if(page==='estoque'&&['baixo','esgotado'].includes(filter))return {tab:5,id,filters:{saldo:filter==='esgotado'?'esgotado':''},label:filter==='esgotado'?'Produtos esgotados':'Estoque baixo',clearTab:0};
- if(page==='pedidos'&&['Pendente','Em preparo','Pronto'].includes(filter))return {tab:0,id,filters:{status:filter},label:'Pedidos · '+filter,clearTab:0};
- if(page==='financeiro'&&filter==='Pendente')return {tab:4,id,filters:{situacao:'Pendente'},label:'Despesas pendentes',clearTab:4};
- return null;
+function notificationURL(x) {
+    return `${x.modulo}.html?${new URLSearchParams({ alerta: x.filtro, registro: x.registro })}`;
 }
-function clearNotificationURL(){const url=new URL(location.href);url.searchParams.delete('alerta');url.searchParams.delete('registro');history.replaceState(history.state,'',url);}
-function applyNotificationContext(route,open){
- const panel=$('#painel'),form=$('#filtro',panel);if(!form)return;
- Object.entries(route.filters).forEach(([name,value])=>{if(form.elements[name])form.elements[name].value=value;});
- form.dispatchEvent(new Event('change',{bubbles:true}));
- const target=[...panel.querySelectorAll('[data-record-id]')].find(row=>row.dataset.recordId===route.id);
- const banner=document.createElement('div');banner.id='notification-context';banner.className='notification-context';
- banner.innerHTML=`<div><strong>Acesso por notificação · ${esc(route.label)}</strong><p role="status">${target?'Registro relacionado localizado. Os demais resultados continuam disponíveis.':'O registro não está mais disponível neste filtro. Confira os resultados atuais.'}</p></div><button type="button" class="btn small" id="clear-notification">Limpar filtros</button>`;
- form.before(banner);$('#clear-notification',banner).onclick=()=>{clearNotificationURL();open(route.clearTab);$('#painel h2')?.scrollIntoView({block:'nearest'});};
- const changed=()=>{clearNotificationURL();$('p',banner).textContent='Filtros ajustados manualmente.';};form.addEventListener('input',changed);form.addEventListener('change',changed);
- if(!target)return;
- target.classList.add('notification-target');target.tabIndex=-1;
- requestAnimationFrame(()=>requestAnimationFrame(()=>{if(!target.isConnected)return;const toggle=$('.record-toggle',target);if(toggle&&getComputedStyle(toggle).display!=='none'&&toggle.getAttribute('aria-expanded')==='false')toggle.click();target.focus({preventScroll:true});target.scrollIntoView({block:'nearest',behavior:'auto'});setTimeout(()=>target.classList.remove('notification-target'),6500);}));
+function notificationDestination(x) {
+    return x.modulo === 'estoque'
+        ? (x.filtro === 'esgotado' ? 'produtos esgotados' : 'estoque baixo')
+        : x.modulo === 'pedidos' ? 'pedidos · ' + x.filtro.toLowerCase() : 'despesas pendentes';
 }
-function abas(items,render){
- let current=0;const route=notificationContext(document.body.dataset.page);const root=$('#conteudo');
- root.innerHTML=`<div class="module-nav"><div class="tabs" aria-label="Funcionalidades">${items.map((x,i)=>`<button type="button" class="tab" aria-pressed="${i===0}" aria-selected="${i===0}" data-tab="${i}">${esc(x)}</button>`).join('')}</div><label class="field mobile-module-select"><span>O que deseja fazer?</span><select id="module-select">${items.map((x,i)=>`<option value="${i}">${esc(x)}</option>`).join('')}</select></label></div><div id="painel" class="section-gap"></div><details class="card disclosure module-summary"><summary><span><strong>Resumo do módulo</strong><small>Indicadores gerais</small></span></summary><div id="metricas" class="grid four"></div></details><div id="module-dashboard"></div>`;
- const choice=$('#module-select',root);const open=i=>{if($('#notification-context',root))clearNotificationURL();current=i;choice.value=String(i);root.querySelectorAll('[data-tab]').forEach(b=>{const active=Number(b.dataset.tab)===i;b.setAttribute('aria-selected',String(active));b.setAttribute('aria-pressed',String(active));});render(i);refreshModuleDashboard(i);};
- root.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>open(Number(b.dataset.tab)));choice.onchange=()=>open(Number(choice.value));open(route?route.tab:0);if(route)applyNotificationContext(route,open);return {refresh:()=>open(current),open};
+function notificationContext(page) {
+    const q = new URLSearchParams(location.search), filter = q.get('alerta'), id = q.get('registro');
+    if (!id || !filter || !allowed(session(), page))
+        return null;
+    if (page === 'estoque' && ['baixo', 'esgotado'].includes(filter))
+        return {
+            tab: 5,
+            id,
+            filters: { saldo: filter === 'esgotado' ? 'esgotado' : 'positivo' },
+            label: filter === 'esgotado' ? 'Produtos esgotados' : 'Estoque baixo',
+            clearTab: 0
+        };
+    if (page === 'pedidos' && ['Pendente', 'Em preparo', 'Pronto'].includes(filter))
+        return {
+            tab: 0,
+            id,
+            filters: { status: filter },
+            label: 'Pedidos · ' + filter,
+            clearTab: 0
+        };
+    // Link de confirmação de estorno: filtra o histórico pelo pedido ou pelo lançamento.
+    if (page === 'financeiro' && filter === 'Estorno') {
+        const d = Dados.ler();
+        const r = d.receitas.find(x => x.id === id && x.estornoDe);
+        const p = r && d.pedidos.find(x => x.id === r.pedidoId);
+        return {
+            tab: 6,
+            id,
+            filters: { tipo: 'Estorno', busca: p && allowed(session(), 'pedidos') ? '#' + p.numero : r?.descricao || '' },
+            label: 'Estorno financeiro',
+            direct: true,
+            clearTab: 6
+        };
+    }
+    if (page === 'financeiro' && filter === 'Pendente')
+        return {
+            tab: 4,
+            id,
+            filters: { situacao: 'Pendente' },
+            label: 'Despesas pendentes',
+            clearTab: 4
+        };
+    return null;
 }
-function modal(title,body){let d=$('#modal');if(!d){d=document.createElement('dialog');d.id='modal';document.body.append(d);}d.innerHTML=`<div class="dialog-head"><h2>${esc(title)}</h2><button class="btn small" type="button" id="close-modal">Fechar</button></div>${body}`;$('#close-modal',d).onclick=()=>d.close();if(!d.open)d.showModal();return d;}
-function listenFilters(form,fn){const msg=document.createElement('p');msg.className='error full filter-error';msg.setAttribute('role','status');msg.hidden=true;form.append(msg);const run=()=>{const v=Object.fromEntries(new FormData(form));const invalid=[...form.querySelectorAll('.date-text')].some(x=>!x.validity.valid);const bad=invalid||(v.de&&v.ate&&v.de>v.ate);msg.hidden=!bad;msg.textContent=invalid?'Informe uma data válida. O último resultado válido permanece visível.':bad?'A data final deve ser igual ou posterior à inicial. O último resultado válido permanece visível.':'';const scope=form.closest('.card')||form.parentElement;scope.querySelectorAll('#exportar,#imprimir').forEach(b=>b.disabled=!!bad);if(!bad)fn();};form.addEventListener('input',run);form.addEventListener('change',run);form.addEventListener('submit',e=>e.preventDefault());run();}
-function dateFields(){return field('De',input('de','date'))+field('Até',input('ate','date'));}
-function downloadCSV(name,rows){const cell=x=>'"'+(typeof x==='number'?String(x):String(x??'').replace(/^[=+@-]/,m=>"'"+m)).replace(/"/g,'""')+'"';const blob=new Blob(['\ufeff'+rows.map(r=>r.map(cell).join(';')).join('\r\n')],{type:'text/csv;charset=utf-8'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
-document.addEventListener('click',e=>{if(e.target.closest('[data-theme-button]'))toggleTheme();});theme();
+function clearNotificationURL() {
+    const url = new URL(location.href);
+    url.searchParams.delete('alerta');
+    url.searchParams.delete('registro');
+    history.replaceState(history.state, '', url);
+}
 
+// Abre o registro relacionado ao alerta e ajusta os filtros da consulta.
+function applyNotificationContext(route, open) {
+    const panel = $('#painel'), form = $('#filtro', panel);
+    if (!form)
+        return;
+    Object.entries(route.filters).forEach(([name, value]) => {
+        if (form.elements[name])
+            form.elements[name].value = value;
+    });
+    form.dispatchEvent(new Event('change', { bubbles: true }));
+    const target = [...panel.querySelectorAll('[data-record-id]')].find(row => row.dataset.recordId === route.id);
+    const banner = document.createElement('div');
+    banner.id = 'notification-context';
+    banner.className = 'notification-context';
+    banner.innerHTML = (`<div>` +
+        `<strong>${route.direct ? "Consulta do lançamento" : "Acesso por notificação"} · ${esc(route.label)}</strong>` +
+        `<p role="status">` +
+        `${target
+            ? 'Registro relacionado localizado. Os demais resultados continuam disponíveis.'
+            : 'O registro não está mais disponível neste filtro. Confira os resultados atuais.'}` +
+        `</p>` +
+        `</div>` +
+        `<button type="button" class="btn small" id="clear-notification">Limpar filtros</button>`);
+    form.before(banner);
+    $('#clear-notification', banner).onclick = () => {
+        clearNotificationURL();
+        open(route.clearTab);
+        $('#painel h2')?.scrollIntoView({ block: 'nearest' });
+    };
+    const changed = () => {
+        clearNotificationURL();
+        $('p', banner).textContent = 'Filtros ajustados manualmente.';
+    };
+    form.addEventListener('input', changed);
+    form.addEventListener('change', changed);
+    if (!target)
+        return;
+    target.classList.add('notification-target');
+    target.tabIndex = -1;
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+        if (!target.isConnected)
+            return;
+        const toggle = $('.record-toggle', target);
+        if (toggle && getComputedStyle(toggle).display !== 'none' && toggle.getAttribute('aria-expanded') === 'false')
+            toggle.click();
+        target.focus({ preventScroll: true });
+        target.scrollIntoView({ block: 'nearest', behavior: 'auto' });
+        setTimeout(() => target.classList.remove('notification-target'), 6500);
+    }));
+}
+
+// Controla a navegação entre funcionalidades do módulo e renderiza a aba selecionada.
+function abas(items, render) {
+    let current = 0;
+    const route = notificationContext(document.body.dataset.page);
+    const root = $('#conteudo');
+    root.innerHTML = (`<div class="module-nav">` +
+        `<div class="tabs" aria-label="Funcionalidades">` +
+        `${items.map((x, i) => `<button type="button" class="tab" aria-pressed="${i === 0}" aria-selected="${i === 0}" data-tab="${i}">${esc(x)}</button>`).join('')}` +
+        `</div>` +
+        `<label class="field mobile-module-select">` +
+        `<span>O que deseja fazer?</span>` +
+        `<select id="module-select">` +
+        `${items.map((x, i) => `<option value="${i}">${esc(x)}</option>`).join('')}</select>` +
+        `</label>` +
+        `</div>` +
+        `<div id="painel" class="section-gap">` +
+        `</div>` +
+        `<details class="card disclosure module-summary">` +
+        `<summary>` +
+        `<span>` +
+        `<strong>Resumo do módulo</strong>` +
+        `<small>Indicadores gerais</small>` +
+        `</span>` +
+        `</summary>` +
+        `<div id="metricas" class="grid four">` +
+        `</div>` +
+        `</details>` +
+        `<div id="module-dashboard">` +
+        `</div>`);
+    const choice = $('#module-select', root);
+    const open = i => {
+        if ($('#notification-context', root))
+            clearNotificationURL();
+        current = i;
+        choice.value = String(i);
+        root.querySelectorAll('[data-tab]').forEach(b => {
+            const active = Number(b.dataset.tab) === i;
+            b.setAttribute('aria-selected', String(active));
+            b.setAttribute('aria-pressed', String(active));
+        });
+        render(i);
+        refreshModuleDashboard(i);
+    };
+    root.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => open(Number(b.dataset.tab)));
+    choice.onchange = () => open(Number(choice.value));
+    open(route ? route.tab : 0);
+    if (route)
+        applyNotificationContext(route, open);
+    return { refresh: () => open(current), open };
+}
+
+// Monta a janela de diálogo reutilizável para edição e confirmação.
+function modal(title, body) {
+    let d = $('#modal');
+    if (!d) {
+        d = document.createElement('dialog');
+        d.id = 'modal';
+        document.body.append(d);
+    }
+    d.innerHTML = `<div class="dialog-head"><h2>${esc(title)}</h2><button class="btn small" type="button" id="close-modal">Fechar</button></div>${body}`;
+    $('#close-modal', d).onclick = () => d.close();
+    if (!d.open)
+        d.showModal();
+    return d;
+}
+
+// Observa alterações nos campos e executa novamente a consulta.
+function listenFilters(form, fn) {
+    const msg = document.createElement('p');
+    msg.className = 'error full filter-error';
+    msg.setAttribute('role', 'status');
+    msg.hidden = true;
+    form.append(msg);
+    let last = null;
+    const run = (event) => {
+        const v = Object.fromEntries(new FormData(form));
+        const invalid = [...form.querySelectorAll('.date-text')].some(x => !x.validity.valid);
+        const bad = invalid || (v.de && v.ate && v.de > v.ate);
+        msg.hidden = !bad;
+        msg.textContent = invalid
+            ? 'Informe uma data válida. O último resultado válido permanece visível.'
+            : bad ? 'A data final deve ser igual ou posterior à inicial. O último resultado válido permanece visível.' : '';
+        const scope = form.closest('.card') || form.parentElement;
+        scope.querySelectorAll('#exportar,#imprimir').forEach(b => b.disabled = !!bad);
+        if (!bad) {
+            const signature = JSON.stringify(v);
+            if (event?.isTrusted && signature === last)
+                return;
+            last = signature;
+            fn();
+        }
+    };
+    form.addEventListener('input', run);
+    form.addEventListener('change', run);
+    form.addEventListener('submit', e => e.preventDefault());
+    run();
+}
+function dateFields() {
+    return field('De', input('de', 'date')) + field('Até', input('ate', 'date'));
+}
+
+// Gera um arquivo CSV local, protegendo textos que poderiam ser interpretados como fórmulas.
+function downloadCSV(name, rows) {
+    const cell = x => '"' + (typeof x === 'number' ? String(x) : String(x ?? '').replace(/^(?=[\s\uFEFF]*[=+@-]|[\t\r\n])/, "'")).replace(/"/g, '""') + '"';
+    const blob = new Blob(['\ufeff' + rows.map(r => r.map(cell).join(';')).join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+document.addEventListener('click', e => {
+    if (e.target.closest('[data-theme-button]'))
+        toggleTheme();
+});
+theme();
 /* Visualizações nativas, sem bibliotecas nem serviços externos. */
-const paleta=['#287ac6','#159589','#e4a23d','#9a70c9','#d56478','#669bb8','#596bc1','#94a84b'];
-function groupValues(arr,key,val=x=>x.valor){const m=new Map();arr.forEach(x=>{const k=key(x);m.set(k,(m.get(k)||0)+Number(val(x)));});return [...m].map(([label,value])=>({label,value:Math.round(value*1000)/1000})).sort((a,b)=>b.value-a.value);}
-const chartEmpty=()=>'<p class="chart-empty">Sem dados para o período selecionado.</p>';
-function rawRing(data,hole=true,fmt=numero){data=data.filter(x=>x.value>0);const total=data.reduce((a,x)=>a+x.value,0);if(!total)return chartEmpty();let cursor=0;const arcs=data.map((x,i)=>{const start=cursor;cursor+=x.value/total*100;const color=x.color||paleta[i%paleta.length],title=`<title>${esc(x.label)}: ${esc(fmt(x.value))} (${Math.round(x.value/total*100)}%)</title>`;if(!hole){if(data.length===1)return `<circle cx="90" cy="90" r="84" fill="${color}">${title}</circle>`;const pos=p=>[90+84*Math.cos((p/100*360-90)*Math.PI/180),90+84*Math.sin((p/100*360-90)*Math.PI/180)],a=pos(start),b=pos(cursor);return `<path d="M90 90 L${a.join(' ')} A84 84 0 ${cursor-start>50?1:0} 1 ${b.join(' ')} Z" fill="${color}">${title}</path>`;}return `<circle cx="90" cy="90" r="63" pathLength="100" fill="none" stroke="${color}" stroke-width="28" stroke-dasharray="${cursor-start} ${100-(cursor-start)}" stroke-dashoffset="${-start}" transform="rotate(-90 90 90)">${title}</circle>`;}).join('');return `<div class="ring-chart"><svg viewBox="0 0 180 180" role="img" aria-label="${esc(data.map(x=>x.label+': '+fmt(x.value)).join('; '))}">${arcs}${hole?`<text x="90" y="87" text-anchor="middle" class="chart-value">${esc(fmt(total).length>14?numero(total):fmt(total))}</text><text x="90" y="105" text-anchor="middle" class="chart-label">Total</text>`:''}</svg><div class="chart-legend">${data.map((x,i)=>`<div><i style="background:${x.color||paleta[i%paleta.length]}"></i><span>${esc(x.label)}</span><strong>${esc(fmt(x.value))} <small>(${Math.round(x.value/total*100)}%)</small></strong></div>`).join('')}</div></div>`;}
-function rawBars(data,horizontal=false,fmt=numero){if(!data.length)return chartEmpty();const max=Math.max(1,...data.map(x=>x.value));if(horizontal)return `<div class="hbars">${data.map((x,i)=>`<div><div class="row bar-caption"><span>${esc(x.label)}</span><strong>${esc(fmt(x.value))}</strong></div><div class="bar-track" data-tip="${esc(x.label+': '+fmt(x.value))}"><div class="bar" style="width:${Math.max(0,x.value/max*100)}%;background:${x.color||paleta[i%paleta.length]}"></div></div></div>`).join('')}</div>`;const width=400,h=180,step=width/data.length;return `<svg class="plot" viewBox="0 0 440 218" role="img" aria-label="${esc(data.map(x=>x.label+': '+fmt(x.value)).join('; '))}">${[0,.25,.5,.75,1].map(t=>`<path d="M35 ${h+12-h*t}H435" class="gridline"/><text x="30" y="${h+15-h*t}" text-anchor="end" class="chart-label">${esc(numero(max*t))}</text>`).join('')}${data.map((x,i)=>{const v=h*x.value/max,px=35+i*step+step*.22;return `<rect x="${px}" y="${h+12-v}" width="${step*.56}" height="${v}" rx="3" fill="${x.color||paleta[i%paleta.length]}"><title>${esc(x.label)}: ${esc(fmt(x.value))}</title></rect><text x="${px+step*.28}" y="${Math.max(10,h+7-v)}" text-anchor="middle" class="chart-label">${esc(fmt(x.value))}</text><text x="${px+step*.28}" y="208" text-anchor="middle" class="chart-label">${esc(x.label.length>10?x.label.slice(0,9)+'…':x.label)}</text>`;}).join('')}</svg><div class="chart-legend compact">${data.map((x,i)=>`<div><i style="background:${x.color||paleta[i%paleta.length]}"></i><span>${esc(x.label)}</span><strong>${esc(fmt(x.value))}</strong></div>`).join('')}</div>`;}
-function rawLines(labels,series,area=false){if(!labels.length)return chartEmpty();const all=series.flatMap(s=>s.values),lo=Math.min(0,...all),hi=Math.max(1,...all),range=hi-lo,x=i=>54+(labels.length===1?180:i*360/(labels.length-1)),y=v=>170-(v-lo)*150/range;return `<svg class="plot" viewBox="0 0 440 210" role="img" aria-label="${esc(series.map(s=>s.label+': '+s.values.map(dinheiro).join(', ')).join('; '))}">${[0,.25,.5,.75,1].map(t=>`<path d="M54 ${y(lo+t*range)}H414" class="gridline"/><text x="48" y="${y(lo+t*range)+3}" text-anchor="end" class="chart-label">${esc(numero(Math.round(lo+t*range)))}</text>`).join('')}${series.map((s,j)=>{const points=s.values.map((v,i)=>`${x(i)},${y(v)}`).join(' '),color=s.color||paleta[j];return `${area?`<polygon points="${x(0)},${y(0)} ${points} ${x(labels.length-1)},${y(0)}" fill="${color}" opacity=".16"/>`:''}<polyline points="${points}" fill="none" stroke="${color}" stroke-width="3" stroke-linejoin="round"/>${s.values.map((v,i)=>`<circle cx="${x(i)}" cy="${y(v)}" r="3.5" fill="${color}"><title>${esc(s.label)} · ${esc(labels[i])}: ${esc(dinheiro(v))}</title></circle>`).join('')}`;}).join('')}${labels.map((l,i)=>i%Math.ceil(labels.length/6)===0?`<text x="${x(i)}" y="190" text-anchor="middle" class="chart-label">${esc(l)}</text>`:'').join('')}</svg><div class="chart-legend compact">${series.map((s,i)=>`<div><i style="background:${s.color||paleta[i]}"></i><span>${esc(s.label)}</span></div>`).join('')}</div>`;}
-function financialSeries(rs,ds){const paid=ds.filter(x=>x.situacao==='Pago');const dates=[...new Set([...rs,...paid].map(x=>x.data))].sort(),r=dates.map(d=>soma(rs.filter(x=>x.data===d))),p=dates.map(d=>soma(paid.filter(x=>x.data===d)));let saldo=0;return {labels:dates.map(d=>dataBR(d).slice(0,5)),r,p,s:dates.map((_,i)=>Math.round((saldo+=r[i]-p[i])*100)/100)};}
-function chartCards(key,d,de='',ate=''){
- if(key==='pedidos'){const ps=d.pedidos.filter(p=>periodo(p.data,de,ate)),vendidos=groupValues(ps.filter(p=>p.status==='Concluído').flatMap(p=>p.itens),x=>x.nome,x=>x.qtd).slice(0,6);return card('Pedidos por situação','Distribuição no período',ring(groupValues(ps,x=>x.status,()=>1),false))+card('Produtos mais vendidos','Quantidade em pedidos concluídos',bars(vendidos));}
- if(key==='estoque'){const ps=d.produtos.filter(p=>p.ativo!==false),ms=d.movimentos.filter(m=>periodo(m.data,de,ate));return card('Níveis de estoque','Saldo atual por produto · até 8 itens com menor saldo',bars([...ps].sort((a,b)=>a.saldo-b.saldo).slice(0,8).map(p=>({label:p.nome+' ('+p.unidade+')',value:p.saldo})),true))+card('Movimentações de estoque','Quantidade de registros por tipo no período',ring(groupValues(ms,m=>m.tipo,()=>1)));}
- if(key==='financeiro'){const rs=d.receitas.filter(x=>periodo(x.data,de,ate)),ds=d.despesas.filter(x=>periodo(x.data,de,ate)),f=financialSeries(rs,ds);return card('Receitas e despesas pagas','Evolução em reais por data',lines(f.labels,[{label:'Receitas',values:f.r},{label:'Despesas pagas',values:f.p}]))+card('Evolução do saldo','Saldo acumulado no período',lines(f.labels,[{label:'Saldo',values:f.s}],true))+card('Formas de pagamento','Recebimentos brutos por forma · estornos excluídos',ring(groupValues(rs.filter(x=>x.valor>0),x=>x.forma),true,dinheiro))+card('Distribuição de despesas','Despesas pagas e pendentes por categoria',bars(groupValues(ds,x=>x.categoria),true,dinheiro));}return '';
+const paleta = ['#287ac6', '#159589', '#e4a23d', '#9a70c9', '#d56478', '#669bb8', '#596bc1', '#94a84b'];
+function groupValues(arr, key, val = x => x.valor) {
+    const m = new Map();
+    arr.forEach(x => {
+        const k = key(x);
+        m.set(k, (m.get(k) || 0) + Number(val(x)));
+    });
+    return [...m].map(([label, value]) => ({ label, value: Math.round(value * 1000) / 1000 })).sort((a, b) => b.value - a.value);
 }
-function refreshModuleDashboard(i){const root=$('#module-dashboard'),key=document.body.dataset.page;if(!root||!['pedidos','estoque','financeiro'].includes(key))return;if(!root.innerHTML){root.innerHTML=`<details class="card analytics disclosure"><summary><span>Dashboard do módulo</span><small>Indicadores e gráficos · filtros independentes</small></summary><form class="filters analytics-filters">${dateFields()}${quickPeriodField()}</form><div id="module-kpis" class="grid three analytics-kpis"></div><div class="grid two" id="module-charts"></div></details>`;const f=$('form',root);bindQuickPeriod(f);listenFilters(f,()=>{const v=Object.fromEntries(new FormData(f));const d=Dados.ler();$('#module-kpis').innerHTML=quickPeriodMetrics(key,d,v.de,v.ate);$('#module-charts').innerHTML=chartCards(key,d,v.de,v.ate);});}else{const f=$('form',root);f.dispatchEvent(new Event('input',{bubbles:true}));}}
+const chartEmpty = () => '<p class="chart-empty">Sem dados para o período selecionado.</p>';
+function rawRing(data, hole = true, fmt = numero) {
+    data = data.filter(x => x.value > 0);
+    const total = data.reduce((a, x) => a + x.value, 0);
+    if (!total)
+        return chartEmpty();
+    let cursor = 0;
+    const arcs = data.map((x, i) => {
+        const start = cursor;
+        cursor += x.value / total * 100;
+        const color = x.color || paleta[i % paleta.length], title = `<title>${esc(x.label)}: ${esc(fmt(x.value))} (${percentual(x.value / total * 100)})</title>`;
+        if (!hole) {
+            if (data.length === 1)
+                return `<circle cx="90" cy="90" r="84" fill="${color}">${title}</circle>`;
+            const pos = p => [90 + 84 * Math.cos((p / 100 * 360 - 90) * Math.PI / 180), 90 + 84 * Math.sin((p / 100 * 360 - 90) * Math.PI / 180)], a = pos(start), b = pos(cursor);
+            return `<path d="M90 90 L${a.join(' ')} A84 84 0 ${cursor - start > 50 ? 1 : 0} 1 ${b.join(' ')} Z" fill="${color}">${title}</path>`;
+        }
+        return (`<circle cx="90" cy="90" r="63" pathLength="100" fill="none" stroke="${color}" stroke-width="28" stroke-dasharray="${cursor - start} ${100 - (cursor - start)}" stroke-dashoffset="${-start}" transform="rotate(-90 90 90)">` +
+            `${title}</circle>`);
+    }).join('');
+    return (`<div class="ring-chart">` +
+        `<svg viewBox="0 0 180 180" role="img" aria-label="${esc(data.map(x => x.label + ': ' + fmt(x.value)).join('; '))}">` +
+        `${arcs}${hole
+            ? (`<text x="90" y="87" text-anchor="middle" class="chart-value">` +
+                `${esc(fmt(total).length > 14 ? numero(total) : fmt(total))}</text>` +
+                `<text x="90" y="105" text-anchor="middle" class="chart-label">Total</text>`)
+            : ''}` +
+        `</svg>` +
+        `<div class="chart-legend">` +
+        `${data.map((x, i) => (`<div>` +
+            `<i style="background:${x.color || paleta[i % paleta.length]}">` +
+            `</i>` +
+            `<span>${esc(x.label)}</span>` +
+            `<strong>${esc(fmt(x.value))} <small>(${percentual(x.value / total * 100)})</small>` +
+            `</strong>` +
+            `</div>`)).join('')}` +
+        `</div>` +
+        `</div>`);
+}
+function rawBars(data, horizontal = false, fmt = numero) {
+    if (!data.length)
+        return chartEmpty();
+    const max = Math.max(1, ...data.map(x => x.value));
+    if (horizontal)
+        return (`<div class="hbars">` +
+            `${data.map((x, i) => (`<div>` +
+                `<div class="row bar-caption">` +
+                `<span>${esc(x.label)}</span>` +
+                `<strong>${esc(fmt(x.value))}</strong>` +
+                `</div>` +
+                `<div class="bar-track" data-tip="${esc(x.label + ': ' + fmt(x.value))}">` +
+                `<div class="bar" style="width:${Math.max(0, x.value / max * 100)}%;background:${x.color || paleta[i % paleta.length]}">` +
+                `</div>` +
+                `</div>` +
+                `</div>`)).join('')}` +
+            `</div>`);
+    const width = 400, h = 180, step = width / data.length;
+    return (`<svg class="plot" viewBox="0 0 440 218" role="img" aria-label="${esc(data.map(x => x.label + ': ' + fmt(x.value)).join('; '))}">` +
+        `${[0, .25, .5, .75, 1].map(t => `<path d="M35 ${h + 12 - h * t}H435" class="gridline"/><text x="30" y="${h + 15 - h * t}" text-anchor="end" class="chart-label">${esc(numero(max * t))}</text>`).join('')}` +
+        `${data.map((x, i) => {
+            const v = h * x.value / max, px = 35 + i * step + step * .22;
+            return (`<rect x="${px}" y="${h + 12 - v}" width="${step * .56}" height="${v}" rx="3" fill="${x.color || paleta[i % paleta.length]}">` +
+                `<title>${esc(x.label)}: ${esc(fmt(x.value))}</title>` +
+                `</rect>` +
+                `<text x="${px + step * .28}" y="${Math.max(10, h + 7 - v)}" text-anchor="middle" class="chart-label">` +
+                `${esc(fmt(x.value))}</text>` +
+                `<text x="${px + step * .28}" y="208" text-anchor="middle" class="chart-label">` +
+                `${esc(x.label.length > 10 ? x.label.slice(0, 9) + '…' : x.label)}</text>`);
+        }).join('')}` +
+        `</svg>` +
+        `<div class="chart-legend compact">` +
+        `${data.map((x, i) => `<div><i style="background:${x.color || paleta[i % paleta.length]}"></i><span>${esc(x.label)}</span><strong>${esc(fmt(x.value))}</strong></div>`).join('')}` +
+        `</div>`);
+}
+function rawLines(labels, series, area = false) {
+    if (!labels.length)
+        return chartEmpty();
+    const all = series.flatMap(s => s.values), lo = Math.min(0, ...all), hi = Math.max(1, ...all), range = hi - lo, x = i => 54 + (labels.length === 1 ? 180 : i * 360 / (labels.length - 1)), y = v => 170 - (v - lo) * 150 / range;
+    return (`<svg class="plot" viewBox="0 0 440 210" role="img" aria-label="${esc(series.map(s => s.label + ': ' + s.values.map(dinheiro).join(', ')).join('; '))}">` +
+        `${[0, .25, .5, .75, 1].map(t => (`<path d="M54 ${y(lo + t * range)}H414" class="gridline"/>` +
+            `<text x="48" y="${y(lo + t * range) + 3}" text-anchor="end" class="chart-label">` +
+            `${esc(numero(Math.round(lo + t * range)))}</text>`)).join('')}` +
+        `${series.map((s, j) => {
+            const points = s.values.map((v, i) => `${x(i)},${y(v)}`).join(' '), color = s.color || paleta[j];
+            return (`${area ? `<polygon points="${x(0)},${y(0)} ${points} ${x(labels.length - 1)},${y(0)}" fill="${color}" opacity=".16"/>` : ''}<polyline points="${points}" fill="none" stroke="${color}" stroke-width="3" stroke-linejoin="round"/>` +
+                `${s.values.map((v, i) => `<circle cx="${x(i)}" cy="${y(v)}" r="3.5" fill="${color}"><title>${esc(s.label)} · ${esc(labels[i])}: ${esc(dinheiro(v))}</title></circle>`).join('')}`);
+        }).join('')}` +
+        `${labels.map((l, i) => i % Math.ceil(labels.length / 6) === 0 ? `<text x="${x(i)}" y="190" text-anchor="middle" class="chart-label">${esc(l)}</text>` : '').join('')}` +
+        `</svg>` +
+        `<div class="chart-legend compact">` +
+        `${series.map((s, i) => `<div><i style="background:${s.color || paleta[i]}"></i><span>${esc(s.label)}</span></div>`).join('')}</div>`);
+}
+
+// Agrupa entradas e pagamentos por data para formar a série de caixa.
+function financialSeries(rs, ds) {
+    const paid = ds.filter(x => x.situacao === 'Pago' && Dados.realizado(x));
+    const dates = [...new Set([...rs, ...paid].map(x => x.data))].sort(), r = dates.map(d => soma(rs.filter(x => x.data === d))), p = dates.map(d => soma(paid.filter(x => x.data === d)));
+    let saldo = 0;
+    return {
+        labels: dates.map(d => dataBR(d).slice(0, 5)),
+        r,
+        p,
+        s: dates.map((_, i) => Math.round((saldo += r[i] - p[i]) * 100) / 100)
+    };
+}
+function chartCards(key, d, de = '', ate = '') {
+    if (key === 'pedidos') {
+        const ps = d.pedidos.filter(p => periodo(p.data, de, ate)), vendidos = groupValues(ps.filter(p => p.status === 'Concluído').flatMap(p => p.itens), x => x.nome, x => x.qtd).slice(0, 6);
+        return card('Pedidos por situação', 'Distribuição no período', ring(groupValues(ps, x => x.status, () => 1), false))
+            + card('Produtos mais vendidos', 'Quantidade em pedidos concluídos', bars(vendidos));
+    }
+    if (key === 'estoque') {
+        const ps = d.produtos.filter(p => p.ativo !== false), ms = d.movimentos.filter(m => periodo(m.data, de, ate));
+        return card('Níveis de estoque', 'Saldo atual por produto · até 8 itens com menor saldo', bars([...ps].sort((a, b) => a.saldo - b.saldo).slice(0, 8).map(p => ({ label: p.nome + ' (' + p.unidade + ')', value: p.saldo })), true))
+            + card('Movimentações de estoque', 'Quantidade de registros por tipo no período', ring(groupValues(ms, m => m.tipo, () => 1)));
+    }
+    if (key === 'financeiro') {
+        const rs = d.receitas.filter(x => Dados.realizado(x) && periodo(x.data, de, ate)), ds = d.despesas.filter(x => periodo(x.data, de, ate) && (x.situacao !== 'Pago' || Dados.realizado(x))), f = financialSeries(rs, ds);
+        return card('Receitas e despesas pagas', 'Evolução em reais por data', lines(f.labels, [{ label: 'Receitas', values: f.r }, { label: 'Despesas pagas', values: f.p }]))
+            + card('Evolução do saldo', 'Saldo acumulado no período', lines(f.labels, [{ label: 'Saldo', values: f.s }], true))
+            + card('Formas de pagamento', 'Recebimentos brutos por forma · estornos excluídos', ring(groupValues(rs.filter(x => x.valor > 0), x => x.forma), true, dinheiro))
+            + card('Distribuição de despesas', 'Lançamentos positivos não cancelados por categoria', bars(groupValues(ds.filter(x => x.situacao !== 'Cancelado' && x.valor > 0), x => x.categoria), true, dinheiro));
+    }
+    return '';
+}
+function refreshModuleDashboard(i) {
+    const root = $('#module-dashboard'), key = document.body.dataset.page;
+    if (!root || !['pedidos', 'estoque', 'financeiro'].includes(key))
+        return;
+    if (!root.innerHTML) {
+        root.innerHTML = (`<details class="card analytics disclosure">` +
+            `<summary>` +
+            `<span>Dashboard do módulo</span>` +
+            `<small>Indicadores e gráficos · filtros independentes</small>` +
+            `</summary>` +
+            `<form class="filters analytics-filters">${dateFields()}${quickPeriodField()}</form>` +
+            `<div id="module-kpis" class="grid three analytics-kpis">` +
+            `</div>` +
+            `<div class="grid two" id="module-charts">` +
+            `</div>` +
+            `</details>`);
+        const f = $('form', root);
+        bindQuickPeriod(f);
+        listenFilters(f, () => {
+            const v = Object.fromEntries(new FormData(f));
+            const d = Dados.ler();
+            renderIndicators($('#module-kpis'), quickPeriodMetrics(key, d, v.de, v.ate));
+            $('#module-charts').innerHTML = chartCards(key, d, v.de, v.ate);
+        });
+    }
+    else {
+        const f = $('form', root);
+        f.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+}
 // Em telas pequenas, a tela cheia nativa mantém a navegação do sistema.
-const isMobileLayout=()=>matchMedia('(max-width: 760px)').matches;
-const nativeFullscreenAvailable=()=>document.fullscreenEnabled===true&&typeof document.documentElement.requestFullscreen==='function'&&typeof document.exitFullscreen==='function';
-function syncFullscreen(){const b=$('#fullscreen');if(!b)return;const mobile=isMobileLayout();const on=!!document.fullscreenElement||document.body.classList.contains('tv-mode');b.hidden=mobile&&!nativeFullscreenAvailable()&&!on;b.setAttribute('aria-pressed',String(on));b.textContent=on?'Sair da tela cheia':'⛶ Tela cheia';}
-async function toggleFullscreen(){const mobile=isMobileLayout(),on=!!document.fullscreenElement||document.body.classList.contains('tv-mode');if(on){document.body.classList.remove('tv-mode');if(document.fullscreenElement)await document.exitFullscreen().catch(()=>{});}else if(mobile){if(nativeFullscreenAvailable()){try{await document.documentElement.requestFullscreen();}catch{feedback('Tela cheia indisponível neste navegador.',true);}}}else{document.body.classList.add('tv-mode');if(nativeFullscreenAvailable())await document.documentElement.requestFullscreen().catch(()=>{});}syncFullscreen();}
-document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement)document.body.classList.remove('tv-mode');syncFullscreen();});
-
-function periodMetrics(key,d,de,ate){const inRange=x=>periodo(x.data,de,ate);if(key==='pedidos'){const p=d.pedidos.filter(inRange);return stat('Pedidos no período',p.length,'Todos os status','pedidos')+stat('Concluídos',p.filter(x=>x.status==='Concluído').length,'No período','check')+stat('Valor concluído',dinheiro(soma(p.filter(x=>x.status==='Concluído'),x=>x.total)),'Total dos pedidos concluídos no período de registro','financeiro');}if(key==='estoque'){const m=d.movimentos.filter(inRange);return ['Entrada','Saída','Ajuste'].map(t=>stat(t,m.filter(x=>x.tipo===t).length,'Registros no período','estoque')).join('');}const r=soma(d.receitas.filter(inRange)),p=soma(d.despesas.filter(x=>inRange(x)&&x.situacao==='Pago'));return stat('Recebimentos',dinheiro(r),'No período','financeiro')+stat('Despesas pagas',dinheiro(p),'No período','financeiro')+stat('Saldo do período',dinheiro(r-p),'Sem saldo anterior','dashboard');}
-
-/* V3 — componentes de interface e interação sem dependências. */
-function confirmUI(title,message,fn){const d=modal(title,`<p>${esc(message)}</p><div class="actions" style="margin-top:18px">${btn('Voltar','','type="button" id="confirm-no"')}${btn('Confirmar','danger','type="button" id="confirm-yes"')}</div>`);$('#confirm-no',d).onclick=()=>d.close();$('#confirm-yes',d).onclick=()=>{try{fn();d.close();}catch(e){feedback(e.message,true);}};}
-function quickPeriodField(){return field('Período rápido',select('rapido',opcoes([{value:'',label:'Todo o histórico / personalizado'},{value:'1',label:'Hoje'},{value:'ontem',label:'Ontem'},{value:'7',label:'Últimos 7 dias'},{value:'30',label:'Últimos 30 dias'},{value:'mes',label:'Este mês'},{value:'anterior',label:'Mês anterior'}])));}
-function bindQuickPeriod(f){const sel=f.elements.rapido;if(!sel)return;const prefKey='gato-periodo-'+(session()?.id||'demo')+'-'+document.body.dataset.page;const persist=()=>{const v=Object.fromEntries(new FormData(f));if([...f.querySelectorAll('.date-text')].every(x=>x.validity.valid)&&(!v.de||!v.ate||v.de<=v.ate))try{localStorage.setItem(prefKey,JSON.stringify(v));}catch(e){}};sel.addEventListener('change',()=>{const v=sel.value;let de='',ate='';if(v==='ontem')de=ate=Dados.dia(-1);else if(v==='mes') {de=Dados.dia().slice(0,7)+'-01';ate=Dados.dia();}else if(v==='anterior'){const now=new Date();const end=new Date(now.getFullYear(),now.getMonth(),0);const iso=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;ate=iso(end);de=ate.slice(0,7)+'-01';}else if(Number(v)>0){de=Dados.dia(1-Number(v));ate=Dados.dia();}for(const [key,val] of [['de',de],['ate',ate]]){const box=f.elements[key].closest('.date-control');$('.date-text',box).value=val?dataBR(val):'';syncDate($('.date-text',box));}f.dispatchEvent(new Event('input',{bubbles:true}));persist();});f.addEventListener('input',e=>{if(e.target.matches?.('.date-text,.date-picker'))sel.value='';persist();});try{const pref=JSON.parse(localStorage.getItem(prefKey)||'null');if(pref){sel.value=pref.rapido||'';if(sel.value)sel.dispatchEvent(new Event('change'));else for(const key of ['de','ate']){const box=f.elements[key].closest('.date-control');$('.date-text',box).value=pref[key]?dataBR(pref[key]):'';syncDate($('.date-text',box));}}}catch(e){}}
-function previousPeriod(de,ate){if(!de||!ate)return null;const a=Date.parse(de),b=Date.parse(ate),delta=b-a+86400000;return [new Date(a-delta).toISOString().slice(0,10),new Date(a-86400000).toISOString().slice(0,10)];}
-function comparison(value,previous,fmt=numero){if(previous===null)return 'Selecione um período para comparar';if(previous===0)return value===0?'Sem variação · base zero':'Sem base anterior para percentual';return `${value>=previous?'+':''}${((value-previous)/Math.abs(previous)*100).toLocaleString('pt-BR',{maximumFractionDigits:1})}% vs. período anterior · ${fmt(previous)}`;}
-function quickPeriodMetrics(key,d,de,ate){const old=previousPeriod(de,ate);const compare=(value,fn,fmt=numero)=>comparison(value,old?fn(...old):null,fmt);const p=(a,b)=>d.pedidos.filter(x=>periodo(x.data,a,b));const r=(a,b)=>soma(d.receitas.filter(x=>periodo(x.data,a,b)));const ds=(a,b)=>d.despesas.filter(x=>periodo(x.data,a,b));const paid=(a,b)=>soma(ds(a,b).filter(x=>x.situacao==='Pago'));const done=(a,b)=>p(a,b).filter(x=>x.status==='Concluído');const ticket=(a,b)=>{const ps=done(a,b);return ps.length?soma(ps,x=>x.total)/ps.length:0;};
- if(key==='pedidos'){return [['Pedidos registrados',p(de,ate).length,(a,b)=>p(a,b).length],['Concluídos',done(de,ate).length,(a,b)=>done(a,b).length],['Cancelados',p(de,ate).filter(x=>x.status==='Cancelado').length,(a,b)=>p(a,b).filter(x=>x.status==='Cancelado').length],['Ticket médio',ticket(de,ate),ticket,dinheiro]].map(([label,v,fn,fmt=numero])=>stat(label,fmt(v),compare(v,fn,fmt),'pedidos')).join('');}
- if(key==='financeiro'){const saldo=(a,b)=>r(a,b)-paid(a,b),pend=(a,b)=>soma(ds(a,b).filter(x=>x.situacao==='Pendente')),gross=(a,b)=>soma(d.receitas.filter(x=>x.valor>0&&periodo(x.data,a,b)));return [['Receitas líquidas',r],['Despesas pagas',paid],['Saldo do período',saldo],['Despesas pendentes',pend],['Faturamento recebido bruto',gross]].map(([label,fn])=>stat(label,dinheiro(fn(de,ate)),compare(fn(de,ate),fn,dinheiro),'financeiro')).join('');}
- const mov=(a,b)=>d.movimentos.filter(x=>periodo(x.data,a,b)).length;return stat('Movimentações',mov(de,ate),compare(mov(de,ate),mov),'estoque')+stat('Estoque baixo',d.produtos.filter(x=>x.ativo!==false&&x.saldo<x.minimo).length,'Posição atual','alert')+stat('Produtos ativos',d.produtos.filter(x=>x.ativo!==false).length,'Posição atual','estoque');
+const isMobileLayout = () => matchMedia('(max-width: 760px)').matches;
+const nativeFullscreenAvailable = () => document.fullscreenEnabled === true && typeof document.documentElement.requestFullscreen === 'function' && typeof document.exitFullscreen === 'function';
+function syncFullscreen() {
+    const b = $('#fullscreen');
+    if (!b)
+        return;
+    const mobile = isMobileLayout();
+    const on = !!document.fullscreenElement || document.body.classList.contains('tv-mode');
+    b.hidden = mobile && !nativeFullscreenAvailable() && !on;
+    b.setAttribute('aria-pressed', String(on));
+    b.textContent = on ? 'Sair da tela cheia' : '⛶ Tela cheia';
 }
-function initExtras(page){const u=session();const collapse=$('#collapse-menu');if(collapse){const key='gato-menu-'+u.id;const sync=()=>{const on=localStorage.getItem(key)==='1';document.body.classList.toggle('menu-compact',on);collapse.textContent=on?'☰ Expandir':'☰ Recolher menu';collapse.setAttribute('aria-expanded',String(!on));};collapse.onclick=()=>{localStorage.setItem(key,localStorage.getItem(key)==='1'?'0':'1');sync();};sync();}$('#global-search').onclick=searchUI;$('#notifications').onclick=notificationsUI;updateNotificationCount();document.addEventListener('dados-atualizados',updateNotificationCount);}
-function alertas(){const u=session();if(!u)return [];const d=Dados.ler(),list=[];if(allowed(u,'estoque'))d.produtos.filter(p=>p.ativo!==false&&p.saldo<p.minimo).forEach(p=>list.push({id:'estoque:'+p.id+':'+p.saldo+':'+p.minimo,modulo:'estoque',registro:p.id,filtro:p.saldo===0?'esgotado':'baixo',titulo:p.nome+' com estoque baixo',texto:`Saldo ${numero(p.saldo)} ${p.unidade} · mínimo ${numero(p.minimo)}`}));if(allowed(u,'pedidos'))d.pedidos.filter(p=>['Pendente','Em preparo','Pronto'].includes(p.status)).forEach(p=>list.push({id:'pedido:'+p.id+':'+p.status,modulo:'pedidos',registro:p.id,filtro:p.status,titulo:'Pedido #'+p.numero+' · '+p.status,texto:'Aguardando conclusão'}));if(allowed(u,'financeiro'))d.despesas.filter(x=>x.situacao==='Pendente').forEach(x=>list.push({id:'despesa:'+x.id,modulo:'financeiro',registro:x.id,filtro:'Pendente',titulo:x.descricao,texto:'Despesa pendente · '+dinheiro(x.valor)}));return list;}
-function updateNotificationCount(){const b=$('#notification-count'),u=session();if(b&&u){const l=Dados.ler().notificacoesLidas[u.id]||[];const count=alertas().filter(x=>!l.includes(x.id)).length;b.textContent=count>99?'99+':count;b.closest('button').setAttribute('aria-label',`Notificações: ${count} não lidas`);}}
-function notificationsUI(){const u=session(),l=Dados.ler().notificacoesLidas[u.id]||[],items=alertas();const d=modal('Central de notificações',`<div class="section-gap">${items.length?items.map(x=>`<article class="notice-item ${l.includes(x.id)?'read':''}"><a class="notice-link" href="${esc(notificationURL(x))}"><div><strong>${esc(x.titulo)}</strong><p class="muted">${esc(x.texto)}</p><small>Ver ${esc(notificationDestination(x))} →</small></div></a><div class="actions">${l.includes(x.id)?'<small>Lida</small>':btn('Marcar como lida','small',`type="button" data-read="${esc(x.id)}"`)}</div></article>`).join(''):'<p class="note">Nenhum alerta nos módulos autorizados.</p>'}</div>`);d.querySelectorAll('[data-read]').forEach(b=>b.onclick=()=>{try{Dados.atualizar(dd=>{const set=new Set(dd.notificacoesLidas[u.id]||[]);set.add(b.dataset.read);dd.notificacoesLidas[u.id]=[...set];},null);notificationsUI();}catch(e){feedback(e.message,true);}});}
-function searchUI(){const u=session(),d=Dados.ler(),items=[];if(allowed(u,'pedidos'))d.pedidos.forEach(p=>items.push({mod:'pedidos',nome:'Pedido #'+p.numero,desc:p.status+' · '+p.itens.map(i=>i.nome).join(', ')}));if(allowed(u,'estoque'))d.produtos.forEach(p=>items.push({mod:'estoque',nome:p.nome,desc:p.categoria}));if(allowed(u,'financeiro'))[...d.receitas,...d.despesas].forEach(x=>items.push({mod:'financeiro',nome:x.descricao,desc:dinheiro(x.valor)}));const dlg=modal('Pesquisar no sistema',`<label class="field"><span>Pesquisar registros autorizados</span><input type="search" id="global-query" placeholder="Digite um nome ou número"></label><div id="search-results" class="section-gap" style="margin-top:15px"></div>`);const f=$('#global-query',dlg);f.oninput=()=>{const q=f.value.trim().toLowerCase();$('#search-results',dlg).innerHTML=(q?items.filter(x=>(x.nome+' '+x.desc).toLowerCase().includes(q)).slice(0,25).map(x=>`<a class="notice-item" href="${x.mod}.html"><strong>${esc(x.nome)}</strong><span>${esc(x.desc)}</span><small>Ir para ${esc(x.mod)}</small></a>`).join(''):'')||'<p class="note">'+(q?'Nenhum registro encontrado.':'Digite para pesquisar.')+'</p>';};f.oninput();f.focus();}
+async function toggleFullscreen() {
+    const mobile = isMobileLayout(), on = !!document.fullscreenElement || document.body.classList.contains('tv-mode');
+    if (on) {
+        document.body.classList.remove('tv-mode');
+        if (document.fullscreenElement)
+            await document.exitFullscreen().catch(() => { });
+    }
+    else if (mobile) {
+        if (nativeFullscreenAvailable()) {
+            try {
+                await document.documentElement.requestFullscreen();
+            }
+            catch {
+                feedback('Tela cheia indisponível neste navegador.', true);
+            }
+        }
+    }
+    else {
+        document.body.classList.add('tv-mode');
+        if (nativeFullscreenAvailable())
+            await document.documentElement.requestFullscreen().catch(() => { });
+    }
+    syncFullscreen();
+}
+document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement)
+        document.body.classList.remove('tv-mode');
+    syncFullscreen();
+});
+function periodMetrics(key, d, de, ate) {
+    const inRange = x => periodo(x.data, de, ate);
+    if (key === 'pedidos') {
+        const p = d.pedidos.filter(inRange);
+        return stat('Pedidos no período', p.length, 'Todos os status', 'pedidos') + stat('Concluídos', p.filter(x => x.status === 'Concluído').length, 'No período', 'check')
+            + stat('Valor concluído', dinheiro(soma(p.filter(x => x.status === 'Concluído'), x => x.total)), 'Total dos pedidos concluídos no período de registro', 'financeiro');
+    }
+    if (key === 'estoque') {
+        const m = d.movimentos.filter(inRange);
+        return ['Entrada', 'Saída', 'Ajuste'].map(t => stat(t, m.filter(x => x.tipo === t).length, 'Registros no período', 'estoque')).join('');
+    }
+    const r = soma(d.receitas.filter(x => Dados.realizado(x) && inRange(x))), p = soma(d.despesas.filter(x => inRange(x) && x.situacao === 'Pago' && Dados.realizado(x)));
+    return stat('Recebimentos', dinheiro(r), 'No período', 'financeiro') + stat('Despesas pagas', dinheiro(p), 'No período', 'financeiro')
+        + stat('Saldo do período', dinheiro(r - p), 'Sem saldo anterior', 'dashboard');
+}
+/* V3 — componentes de interface e interação sem dependências. */
+function confirmUI(title, message, fn) {
+    const d = modal(title, (`<p>${esc(message)}</p>` +
+        `<div class="actions" style="margin-top:18px">${btn('Voltar', '', 'type="button" id="confirm-no"')}${btn('Confirmar', 'danger', 'type="button" id="confirm-yes"')}` +
+        `</div>`));
+    $('#confirm-no', d).onclick = () => d.close();
+    $('#confirm-yes', d).onclick = () => {
+        try {
+            fn();
+            d.close();
+        }
+        catch (e) {
+            feedback(e.message, true);
+        }
+    };
+}
+function quickPeriodField() {
+    return field('Período rápido', select('rapido', opcoes([
+        { value: '', label: 'Todo o histórico / personalizado' },
+        { value: '1', label: 'Hoje' },
+        { value: 'ontem', label: 'Ontem' },
+        { value: '7', label: 'Últimos 7 dias' },
+        { value: '30', label: 'Últimos 30 dias' },
+        { value: 'mes', label: 'Este mês' },
+        { value: 'anterior', label: 'Mês anterior' }
+    ])));
+}
+// Mantém a preferência de período e sincroniza as datas do filtro.
+function bindQuickPeriod(f) {
+    const sel = f.elements.rapido;
+    if (!sel)
+        return;
+    const prefKey = 'gato-periodo-' + (session()?.id || 'demo') + '-' + document.body.dataset.page;
+    const persist = () => {
+        const v = Object.fromEntries(new FormData(f));
+        if ([...f.querySelectorAll('.date-text')].every(x => x.validity.valid) && (!v.de || !v.ate || v.de <= v.ate))
+            try {
+                localStorage.setItem(prefKey, JSON.stringify(v));
+            }
+            catch (e) { }
+    };
+    sel.addEventListener('change', () => {
+        const v = sel.value;
+        let de = '', ate = '';
+        if (v === 'ontem')
+            de = ate = Dados.dia(-1);
+        else if (v === 'mes') {
+            de = Dados.dia().slice(0, 7) + '-01';
+            ate = Dados.dia();
+        }
+        else if (v === 'anterior') {
+            const now = new Date();
+            const end = new Date(now.getFullYear(), now.getMonth(), 0);
+            const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            ate = iso(end);
+            de = ate.slice(0, 7) + '-01';
+        }
+        else if (Number(v) > 0) {
+            de = Dados.dia(1 - Number(v));
+            ate = Dados.dia();
+        }
+        for (const [key, val] of [['de', de], ['ate', ate]]) {
+            const box = f.elements[key].closest('.date-control');
+            $('.date-text', box).value = val ? dataBR(val) : '';
+            syncDate($('.date-text', box));
+        }
+        f.dispatchEvent(new Event('input', { bubbles: true }));
+        persist();
+    });
+    f.addEventListener('input', e => {
+        if (e.target.matches?.('.date-text,.date-picker'))
+            sel.value = '';
+        persist();
+    });
+    try {
+        const pref = JSON.parse(localStorage.getItem(prefKey) || 'null');
+        if (pref) {
+            sel.value = pref.rapido || '';
+            if (sel.value)
+                sel.dispatchEvent(new Event('change'));
+            else
+                for (const key of ['de', 'ate']) {
+                    const box = f.elements[key].closest('.date-control');
+                    $('.date-text', box).value = pref[key] ? dataBR(pref[key]) : '';
+                    syncDate($('.date-text', box));
+                }
+        }
+    }
+    catch (e) { }
+}
+function previousPeriod(de, ate) {
+    if (!de || !ate)
+        return null;
+    const a = Date.parse(de), b = Date.parse(ate), delta = b - a + 86400000;
+    return [new Date(a - delta).toISOString().slice(0, 10), new Date(a - 86400000).toISOString().slice(0, 10)];
+}
+function comparison(value, previous, fmt = numero) {
+    if (previous === null)
+        return 'Selecione um período para comparar';
+    if (previous === 0)
+        return value === 0 ? 'Sem variação · base zero' : 'Sem base anterior para percentual';
+    return `${value >= previous ? '+' : ''}${percentual((value - previous) / Math.abs(previous) * 100)} vs. período anterior · ${fmt(previous)}`;
+}
 
+// Calcula indicadores do período e compara com o intervalo anterior de igual duração.
+function quickPeriodMetrics(key, d, de, ate) {
+    const old = previousPeriod(de, ate), scope = escopoPeriodo(de, ate), compare = (value, fn, fmt = numero) => comparison(value, old ? fn(...old) : null, fmt);
+    const cmp = (value, fn, fmt = numero) => ({
+        scope,
+        comparison: old
+            ? `Comparação: ${compare(value, fn, fmt)}. Compara com o período anterior de mesma duração. A diferença é dividida pelo valor anterior sem sinal e multiplicada por 100, se ele não for zero.`
+            : 'Sem comparação: informe início e fim do período.'
+    });
+    const p = (a, b) => d.pedidos.filter(x => periodo(x.data, a, b)), rs = (a, b) => d.receitas.filter(x => Dados.realizado(x) && periodo(x.data, a, b)), r = (a, b) => soma(rs(a, b)), ds = (a, b) => d.despesas.filter(x => periodo(x.data, a, b)), paid = (a, b) => soma(ds(a, b).filter(x => x.situacao === 'Pago' && Dados.realizado(x))), done = (a, b) => p(a, b).filter(x => x.status === 'Concluído'), cancel = (a, b) => p(a, b).filter(x => x.status === 'Cancelado').length;
+    const ticket = (a, b) => {
+        const ps = done(a, b);
+        return ps.length ? soma(ps, x => x.total) / ps.length : 0;
+    };
+    if (key === 'pedidos') {
+        const concluidos = done(de, ate), total = soma(concluidos, x => x.total);
+        return [
+            ['Pedidos registrados', p(de, ate).length, (a, b) => p(a, b).length],
+            ['Concluídos', concluidos.length, (a, b) => done(a, b).length],
+            ['Cancelados', cancel(de, ate), cancel],
+            [
+                'Ticket médio',
+                ticket(de, ate),
+                ticket,
+                dinheiro,
+                concluidos.length ? `${dinheiro(total)} ÷ ${concluidos.length} = ${dinheiro(ticket(de, ate))}.` : 'Nenhum pedido concluído; ticket médio = R$ 0,00.'
+            ]
+        ].map(([label, v, fn, fmt = numero, memory]) => stat(label, fmt(v), compare(v, fn, fmt), 'pedidos', { ...cmp(v, fn, fmt), memory })).join('');
+    }
+    if (key === 'financeiro') {
+        const saldo = (a, b) => r(a, b) - paid(a, b), pend = (a, b) => soma(ds(a, b).filter(x => x.situacao === 'Pendente')), gross = (a, b) => soma(rs(a, b).filter(x => x.valor > 0));
+        return [
+            ['Receitas líquidas', r, memoriaReceitas(rs(de, ate), r(de, ate))],
+            ['Despesas pagas', paid, memoriaSoma(ds(de, ate).filter(x => x.situacao === 'Pago' && Dados.realizado(x)), paid(de, ate))],
+            ['Saldo do período', saldo, memoriaSaldo(r(de, ate), paid(de, ate))],
+            ['Despesas pendentes', pend, memoriaSoma(ds(de, ate).filter(x => x.situacao === 'Pendente'), pend(de, ate))],
+            ['Faturamento recebido bruto', gross, memoriaSoma(rs(de, ate).filter(x => x.valor > 0), gross(de, ate))]
+        ].map(([label, fn, memory]) => {
+            const v = fn(de, ate);
+            return stat(label, dinheiro(v), compare(v, fn, dinheiro), 'financeiro', { ...cmp(v, fn, dinheiro), memory });
+        }).join('');
+    }
+    const mov = (a, b) => d.movimentos.filter(x => periodo(x.data, a, b)).length, baixos = d.produtos.filter(Dados.estoqueBaixo);
+    return stat('Movimentações', mov(de, ate), compare(mov(de, ate), mov), 'estoque', cmp(mov(de, ate), mov))
+        + stat('Estoque baixo', baixos.length, 'Posição atual', 'alert', { scope: 'Considera o estoque de hoje.', memory: memoriaEstoqueBaixo(baixos) })
+        + stat('Produtos ativos', d.produtos.filter(x => x.ativo !== false).length, 'Posição atual', 'estoque', { scope: 'Considera o estoque de hoje.' });
+}
+function initExtras(page) {
+    const u = session();
+    const collapse = $('#collapse-menu');
+    if (collapse) {
+        const key = 'gato-menu-' + u.id;
+        const sync = () => {
+            const on = localStorage.getItem(key) === '1';
+            document.body.classList.toggle('menu-compact', on);
+            collapse.textContent = on ? '☰ Expandir' : '☰ Recolher menu';
+            collapse.setAttribute('aria-expanded', String(!on));
+        };
+        collapse.onclick = () => {
+            localStorage.setItem(key, localStorage.getItem(key) === '1' ? '0' : '1');
+            sync();
+        };
+        sync();
+    }
+    $('#global-search').onclick = searchUI;
+    $('#notifications').onclick = notificationsUI;
+    updateNotificationCount();
+    document.addEventListener('dados-atualizados', updateNotificationCount);
+}
+// Reúne alertas de pedidos, estoque e financeiro conforme as permissões do usuário.
+function alertas() {
+    const u = session();
+    if (!u)
+        return [];
+    const d = Dados.ler(), list = [];
+    if (allowed(u, 'estoque'))
+        d.produtos.filter(Dados.alertaEstoque).forEach(p => list.push({
+            id: 'estoque:' + p.id + ':' + p.saldo + ':' + p.minimo,
+            modulo: 'estoque',
+            registro: p.id,
+            filtro: p.saldo === 0 ? 'esgotado' : 'baixo',
+            titulo: p.nome + (Dados.esgotado(p) ? ' esgotado' : ' com estoque baixo'),
+            texto: `Saldo ${numero(p.saldo)} ${p.unidade} · ${p.monitorarMinimo === false ? 'Sem mínimo monitorado' : 'mínimo ' + numero(p.minimo)}`
+        }));
+    if (allowed(u, 'pedidos'))
+        d.pedidos.filter(p => ['Pendente', 'Em preparo', 'Pronto'].includes(p.status)).forEach(p => list.push({
+            id: 'pedido:' + p.id + ':' + p.status,
+            modulo: 'pedidos',
+            registro: p.id,
+            filtro: p.status,
+            titulo: 'Pedido #' + p.numero + ' · ' + p.status,
+            texto: itensTexto(p, 2) + ' · Aguardando conclusão'
+        }));
+    if (allowed(u, 'financeiro'))
+        d.despesas.filter(x => x.situacao === 'Pendente').forEach(x => list.push({
+            id: 'despesa:' + x.id,
+            modulo: 'financeiro',
+            registro: x.id,
+            filtro: 'Pendente',
+            titulo: x.descricao,
+            texto: 'Despesa pendente · ' + dinheiro(x.valor)
+        }));
+    return list;
+}
+function updateNotificationCount() {
+    const b = $('#notification-count'), u = session();
+    if (b && u) {
+        const l = Dados.ler().notificacoesLidas[u.id] || [];
+        const count = alertas().filter(x => !l.includes(x.id)).length;
+        b.textContent = count > 99 ? '99+' : count;
+        b.closest('button').setAttribute('aria-label', `Notificações: ${count} não lidas`);
+    }
+}
+// Monta a central de notificações e permite acessar o registro que gerou o alerta.
+function notificationsUI() {
+    const u = session(), l = Dados.ler().notificacoesLidas[u.id] || [], items = alertas();
+    const d = modal('Central de notificações', (`<div class="section-gap">` +
+        `${items.length
+            ? items.map(x => (`<article class="notice-item ${l.includes(x.id) ? 'read' : ''}">` +
+                `<a class="notice-link" href="${esc(notificationURL(x))}">` +
+                `<div>` +
+                `<strong>${esc(x.titulo)}</strong>` +
+                `<p class="muted">${esc(x.texto)}</p>` +
+                `<small>Ver ${esc(notificationDestination(x))} →</small>` +
+                `</div>` +
+                `</a>` +
+                `<div class="actions">` +
+                `${l.includes(x.id) ? '<small>Lida</small>' : btn('Marcar como lida', 'small', `type="button" data-read="${esc(x.id)}"`)}</div>` +
+                `</article>`)).join('')
+            : '<p class="note">Nenhum alerta nos módulos autorizados.</p>'}` +
+        `</div>`));
+    d.querySelectorAll('[data-read]').forEach(b => b.onclick = () => {
+        try {
+            Dados.atualizar(dd => {
+                const set = new Set(dd.notificacoesLidas[u.id] || []);
+                set.add(b.dataset.read);
+                dd.notificacoesLidas[u.id] = [...set];
+            }, null);
+            notificationsUI();
+        }
+        catch (e) {
+            feedback(e.message, true);
+        }
+    });
+}
+// Pesquisa registros dos módulos aos quais o usuário tem acesso.
+function searchUI() {
+    const u = session(), d = Dados.ler(), items = [];
+    if (allowed(u, 'pedidos'))
+        d.pedidos.forEach(p => items.push({ mod: 'pedidos', nome: 'Pedido #' + p.numero, desc: p.status + ' · ' + itensTexto(p) }));
+    if (allowed(u, 'estoque'))
+        d.produtos.forEach(p => items.push({ mod: 'estoque', nome: p.nome, desc: p.categoria + ' · ' + Dados.situacaoEstoque(p) }));
+    if (allowed(u, 'financeiro'))
+        [...d.receitas, ...d.despesas].forEach(x => items.push({
+            mod: 'financeiro',
+            nome: x.descricao,
+            desc: dinheiro(x.valor) + (receitaProdutos(x, d) ? ' · ' + receitaProdutos(x, d) : '')
+        }));
+    const dlg = modal('Pesquisar no sistema', (`<label class="field">` +
+        `<span>Pesquisar registros autorizados</span>` +
+        `<input type="search" id="global-query" placeholder="Digite um nome ou número">` +
+        `</label>` +
+        `<div id="search-results" class="section-gap" style="margin-top:15px">` +
+        `</div>`));
+    const f = $('#global-query', dlg);
+    f.oninput = () => {
+        const q = normalizarBusca(f.value);
+        $('#search-results', dlg).innerHTML = (q
+            ? items.filter(x => normalizarBusca(x.nome + ' ' + x.desc).includes(q)).slice(0, 25).map(x => `<a class="notice-item" href="${x.mod}.html"><strong>${esc(x.nome)}</strong><span>${esc(x.desc)}</span><small>Ir para ${esc(x.mod)}</small></a>`).join('')
+            : '')
+            || '<p class="note">' + (q ? 'Nenhum registro encontrado.' : 'Digite para pesquisar.') + '</p>';
+    };
+    f.oninput();
+    f.focus();
+}
 /* Os gráficos originais são mantidos para impressão. Cada gráfico de tela tem modelo próprio,
    controles de série e pontos acessíveis, com tooltip em mouse, toque e foco. */
-function chartView(model){return `<div class="interactive-chart" data-chart="${esc(JSON.stringify(model))}">${chartMarkup(model,[])}</div>`;}
-function chartMarkup(m,hidden){const fmt=m.money?dinheiro:numero;const series=m.kind==='lines'?m.series:m.data;const visible=series.map((x,i)=>({...x,color:paleta[i%paleta.length]})).filter((_,i)=>!hidden.includes(i));let html='';if(m.kind==='lines')html=visible.length?rawLines(m.labels,visible,m.area):chartEmpty();else if(m.kind==='ring')html=visible.length?rawRing(visible,m.hole,fmt):chartEmpty();else html=visible.length?rawBars(visible,m.horizontal,fmt):chartEmpty();return `<div class="chart-visual">${html}</div><div class="chart-controls" aria-label="Séries do gráfico">${series.map((x,i)=>`<button type="button" class="legend-toggle" data-legend="${i}" aria-pressed="${!hidden.includes(i)}"><span class="legend-dot" style="background:${x.color||paleta[i%paleta.length]}"></span>${esc(x.label)}${m.kind==='lines'?'':` <strong>${esc(fmt(x.value))}${m.kind==='ring'&&x.value>0?` · ${Math.round(x.value/(series.reduce((n,s)=>n+Math.max(0,s.value),0)||1)*100)}%`:''}</strong>`}</button>`).join('')}</div>`;}
-function ring(data,hole=true,fmt=numero){return chartView({kind:'ring',data,hole,money:fmt===dinheiro});}
-function bars(data,horizontal=false,fmt=numero){return chartView({kind:'bars',data,horizontal,money:fmt===dinheiro});}
-function lines(labels,series,area=false){return chartView({kind:'lines',labels,series,area});}
-function enhanceMarks(chart){chart.querySelectorAll('.chart-visual svg[role=img]').forEach(s=>s.setAttribute('role','group'));chart.querySelectorAll('.chart-visual svg title').forEach(t=>{const mark=t.parentElement;mark.dataset.tip=t.textContent;mark.setAttribute('tabindex','0');mark.setAttribute('role','button');mark.setAttribute('aria-label',t.textContent);t.remove();});chart.querySelectorAll('.chart-visual [data-tip]').forEach(x=>{x.setAttribute('tabindex','0');x.setAttribute('role','button');x.setAttribute('aria-label',x.dataset.tip);});}
-function showTip(mark){if(!mark)return;document.querySelectorAll('.chart-mark-active').forEach(x=>x.classList.remove('chart-mark-active'));mark.classList.add('chart-mark-active');let t=$('#chart-tooltip');if(!t){t=document.createElement('div');t.id='chart-tooltip';t.className='chart-tooltip';t.setAttribute('role','status');document.body.append(t);}t.textContent=mark.dataset.tip;t.hidden=false;const r=mark.getBoundingClientRect();t.style.left=Math.max(8,Math.min(innerWidth-t.offsetWidth-8,r.left+r.width/2-t.offsetWidth/2))+'px';t.style.top=Math.max(8,r.top-t.offsetHeight-9)+'px';}
-function hideTip(){const t=$('#chart-tooltip');if(t)t.hidden=true;document.querySelectorAll('.chart-mark-active').forEach(x=>x.classList.remove('chart-mark-active'));}
-document.addEventListener('pointerover',e=>{const m=e.target.closest?.('.interactive-chart [data-tip]');if(m)showTip(m);});document.addEventListener('pointerout',e=>{const m=e.target.closest?.('.interactive-chart [data-tip]');if(m&&!m.contains(e.relatedTarget))hideTip();});document.addEventListener('focusin',e=>{const m=e.target.closest?.('.interactive-chart [data-tip]');if(m)showTip(m);});document.addEventListener('focusout',e=>{if(e.target.closest?.('.interactive-chart [data-tip]'))hideTip();});document.addEventListener('click',e=>{const b=e.target.closest?.('[data-legend]');if(b){const c=b.closest('.interactive-chart'),m=JSON.parse(c.dataset.chart),i=Number(b.dataset.legend),hidden=JSON.parse(c.dataset.hidden||'[]');const next=hidden.includes(i)?hidden.filter(x=>x!==i):[...hidden,i];c.dataset.hidden=JSON.stringify(next);c.innerHTML=chartMarkup(m,next);enhanceMarks(c);c.querySelector(`[data-legend="${i}"]`)?.focus();hideTip();return;}const mark=e.target.closest?.('.interactive-chart [data-tip]');if(mark)showTip(mark);else hideTip();});document.addEventListener('keydown',e=>{if(e.key==='Escape')hideTip();if(['Enter',' '].includes(e.key)&&e.target.matches?.('.interactive-chart [data-tip]')){e.preventDefault();showTip(e.target);}});window.addEventListener('resize',hideTip);window.addEventListener('scroll',()=>{const active=$('.chart-mark-active');if(active&&document.activeElement===active)showTip(active);else hideTip();},true);
+function chartView(model) {
+    return `<div class="interactive-chart" data-chart="${esc(JSON.stringify(model))}">${chartMarkup(model, [])}</div>`;
+}
+// Monta o gráfico conforme os dados e as séries escolhidas pelo usuário.
+function chartMarkup(m, hidden) {
+    const fmt = m.money ? dinheiro : numero;
+    const series = m.kind === 'lines' ? m.series : m.data;
+    const visible = series.map((x, i) => ({ ...x, color: paleta[i % paleta.length] })).filter((_, i) => !hidden.includes(i));
+    let html = '';
+    if (m.kind === 'lines')
+        html = visible.length ? rawLines(m.labels, visible, m.area) : chartEmpty();
+    else if (m.kind === 'ring')
+        html = visible.length ? rawRing(visible, m.hole, fmt) : chartEmpty();
+    else
+        html = visible.length ? rawBars(visible, m.horizontal, fmt) : chartEmpty();
+    return (`<div class="chart-visual">${html}</div>` +
+        `<div class="chart-controls" aria-label="Séries do gráfico">` +
+        `${series.map((x, i) => (`<button type="button" class="legend-toggle" data-legend="${i}" aria-pressed="${!hidden.includes(i)}">` +
+            `<span class="legend-dot" style="background:${x.color || paleta[i % paleta.length]}">` +
+            `</span>${esc(x.label)}${m.kind === 'lines'
+                ? ''
+                : ` <strong>${esc(fmt(x.value))}${m.kind === 'ring' && x.value > 0 ? ` · ${percentual(x.value / (series.reduce((n, s) => n + Math.max(0, s.value), 0) || 1) * 100)}` : ''}</strong>`}` +
+            `</button>`)).join('')}` +
+        `</div>`);
+}
+function ring(data, hole = true, fmt = numero) {
+    return chartView({
+        kind: 'ring',
+        data,
+        hole,
+        money: fmt === dinheiro
+    });
+}
+function bars(data, horizontal = false, fmt = numero) {
+    return chartView({
+        kind: 'bars',
+        data,
+        horizontal,
+        money: fmt === dinheiro
+    });
+}
+function lines(labels, series, area = false) {
+    return chartView({
+        kind: 'lines',
+        labels,
+        series,
+        area
+    });
+}
+function enhanceMarks(chart) {
+    chart.querySelectorAll('.chart-visual svg[role=img]').forEach(s => s.setAttribute('role', 'group'));
+    chart.querySelectorAll('.chart-visual svg title').forEach(t => {
+        const mark = t.parentElement;
+        mark.dataset.tip = t.textContent;
+        mark.setAttribute('tabindex', '0');
+        mark.setAttribute('role', 'button');
+        mark.setAttribute('aria-label', t.textContent);
+        t.remove();
+    });
+    chart.querySelectorAll('.chart-visual [data-tip]').forEach(x => {
+        x.setAttribute('tabindex', '0');
+        x.setAttribute('role', 'button');
+        x.setAttribute('aria-label', x.dataset.tip);
+    });
+}
+function showTip(mark) {
+    if (!mark)
+        return;
+    document.querySelectorAll('.chart-mark-active').forEach(x => x.classList.remove('chart-mark-active'));
+    mark.classList.add('chart-mark-active');
+    let t = $('#chart-tooltip');
+    if (!t) {
+        t = document.createElement('div');
+        t.id = 'chart-tooltip';
+        t.className = 'chart-tooltip';
+        t.setAttribute('role', 'status');
+        document.body.append(t);
+    }
+    t.textContent = mark.dataset.tip;
+    t.hidden = false;
+    const r = mark.getBoundingClientRect();
+    t.style.left = Math.max(8, Math.min(innerWidth - t.offsetWidth - 8, r.left + r.width / 2 - t.offsetWidth / 2)) + 'px';
+    t.style.top = Math.max(8, r.top - t.offsetHeight - 9) + 'px';
+}
+function hideTip() {
+    const t = $('#chart-tooltip');
+    if (t)
+        t.hidden = true;
+    document.querySelectorAll('.chart-mark-active').forEach(x => x.classList.remove('chart-mark-active'));
+}
+document.addEventListener('pointerover', e => {
+    const m = e.target.closest?.('.interactive-chart [data-tip]');
+    if (m)
+        showTip(m);
+});
+document.addEventListener('pointerout', e => {
+    const m = e.target.closest?.('.interactive-chart [data-tip]');
+    if (m && !m.contains(e.relatedTarget))
+        hideTip();
+});
+document.addEventListener('focusin', e => {
+    const m = e.target.closest?.('.interactive-chart [data-tip]');
+    if (m)
+        showTip(m);
+});
+document.addEventListener('focusout', e => {
+    if (e.target.closest?.('.interactive-chart [data-tip]'))
+        hideTip();
+});
+document.addEventListener('click', e => {
+    const b = e.target.closest?.('[data-legend]');
+    if (b) {
+        const c = b.closest('.interactive-chart'), m = JSON.parse(c.dataset.chart), i = Number(b.dataset.legend), hidden = JSON.parse(c.dataset.hidden || '[]');
+        const next = hidden.includes(i) ? hidden.filter(x => x !== i) : [...hidden, i];
+        c.dataset.hidden = JSON.stringify(next);
+        c.innerHTML = chartMarkup(m, next);
+        enhanceMarks(c);
+        c.querySelector(`[data-legend="${i}"]`)?.focus();
+        hideTip();
+        return;
+    }
+    const mark = e.target.closest?.('.interactive-chart [data-tip]');
+    if (mark)
+        showTip(mark);
+    else
+        hideTip();
+});
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape')
+        hideTip();
+    if (['Enter', ' '].includes(e.key) && e.target.matches?.('.interactive-chart [data-tip]')) {
+        e.preventDefault();
+        showTip(e.target);
+    }
+});
+window.addEventListener('resize', hideTip);
+window.addEventListener('scroll', () => {
+    const active = $('.chart-mark-active');
+    if (active && document.activeElement === active)
+        showTip(active);
+    else
+        hideTip();
+}, true);
 /* Ordenação e paginação: mantém os nós originais e seus eventos. Relatórios impressos não são paginados por este componente. */
-function enhanceTable(w){if(w.dataset.enhanced||w.closest('#print-report')||w.closest('#modal')||w.closest('#itens'))return;w.dataset.enhanced='1';const table=$('table',w),body=$('tbody',w);if(!table||!body)return;const rows=[...body.rows].filter(r=>!r.querySelector('.empty'));if(!rows.length)return;const size=10;let page=Math.max(0,Math.floor(rows.findIndex(r=>r.classList.contains('notification-target'))/size)),sort=-1,asc=true;const controls=document.createElement('div');controls.className='table-pagination';w.after(controls);const headers=[...table.querySelectorAll('th')];headers.forEach((th,i)=>{if(!th.textContent.trim()||/ação|ações|detalhes|eventos/i.test(th.textContent))return;const b=document.createElement('button');b.type='button';b.className='sort-button';b.textContent=th.textContent+' ↕';th.textContent='';th.append(b);b.onclick=()=>{asc=sort===i?!asc:true;sort=i;headers.forEach(h=>h.removeAttribute('aria-sort'));th.setAttribute('aria-sort',asc?'ascending':'descending');const val=r=>r.cells[i]?.textContent.trim()||'';const norm=x=>{if(/^\d{2}\/\d{2}\/\d{4}$/.test(x))return x.split('/').reverse().join('-');if(/^(R\$\s*)?-?\d[\d.,]*$/.test(x))return Number(x.replace(/R\$\s*/,'').replace(/\./g,'').replace(',','.'));return x;};rows.sort((a,b)=>{const x=norm(val(a)),y=norm(val(b));return (typeof x==='number'&&typeof y==='number'?x-y:String(x).localeCompare(String(y),'pt-BR',{numeric:true}))*(asc?1:-1);});rows.forEach(r=>body.append(r));page=0;draw();};});function draw(){const n=Math.ceil(rows.length/size);rows.forEach((r,i)=>r.hidden=i<page*size||i>=(page+1)*size);controls.innerHTML=n>1?`<small>${rows.length} registros · página ${page+1} de ${n}</small><div class="actions"><button type="button" class="btn small" data-prev ${page===0?'disabled':''}>Anterior</button><button type="button" class="btn small" data-next ${page===n-1?'disabled':''}>Próxima</button></div>`:'';if(n>1){$('[data-prev]',controls).onclick=()=>{page--;draw();};$('[data-next]',controls).onclick=()=>{page++;draw();};}}draw();}
-const enhanceUI=()=>{document.querySelectorAll('.interactive-chart:not([data-ready])').forEach(c=>{c.dataset.ready='1';enhanceMarks(c);});document.querySelectorAll('.table-wrap:not([data-enhanced])').forEach(enhanceTable);};
-new MutationObserver(()=>enhanceUI()).observe(document.body,{childList:true,subtree:true});
-
+// Acrescenta ordenação e paginação à tabela, sem recriar as linhas nem perder eventos.
+function enhanceTable(w) {
+    if (w.dataset.enhanced || w.closest('#print-report') || w.closest('#modal') || w.closest('#itens'))
+        return;
+    w.dataset.enhanced = '1';
+    const table = $('table', w), body = $('tbody', w);
+    if (!table || !body)
+        return;
+    const rows = [...body.rows].filter(r => !r.querySelector('.empty'));
+    if (!rows.length)
+        return;
+    const size = 10;
+    let page = Math.max(0, Math.floor(rows.findIndex(r => r.classList.contains('notification-target')) / size)), sort = -1, asc = true;
+    const controls = document.createElement('div');
+    controls.className = 'table-pagination';
+    w.after(controls);
+    const headers = [...table.querySelectorAll('th')];
+    headers.forEach((th, i) => {
+        if (!th.textContent.trim() || /^(ação|ações|detalhes|eventos)$/i.test(th.textContent.trim()))
+            return;
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'sort-button';
+        b.textContent = th.textContent + ' ↕';
+        th.textContent = '';
+        th.append(b);
+        b.onclick = () => {
+            asc = sort === i ? !asc : true;
+            sort = i;
+            headers.forEach(h => h.removeAttribute('aria-sort'));
+            th.setAttribute('aria-sort', asc ? 'ascending' : 'descending');
+            const val = r => r.cells[i]?.textContent.trim() || '';
+            const norm = x => {
+                if (/^\d{2}\/\d{2}\/\d{4}$/.test(x))
+                    return x.split('/').reverse().join('-');
+                if (/^-?\s*(R\$\s*)?-?\d[\d.,]*$/.test(x))
+                    return Number(x.replace(/R\$\s*/, '').replace(/\s/g, '').replace(/\./g, '').replace(',', '.'));
+                return x;
+            };
+            rows.sort((a, b) => {
+                const ta = a.cells[i]?.querySelector('[data-sort-timestamp]'), tb = b.cells[i]?.querySelector('[data-sort-timestamp]');
+                if (ta && tb) {
+                    const x = ta.dataset.sortTimestamp, y = tb.dataset.sortTimestamp;
+                    const tie = desempateCronologico(a.dataset.recordId, b.dataset.recordId);
+                    if (x === '' || y === '')
+                        return x === y ? tie : x === '' ? 1 : -1;
+                    return (Number(x) - Number(y)) * (asc ? 1 : -1) || tie;
+                }
+                const x = norm(val(a)), y = norm(val(b));
+                return (typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y), 'pt-BR', { numeric: true })) * (asc ? 1 : -1);
+            });
+            rows.forEach(r => body.append(r));
+            page = 0;
+            draw();
+            w.dispatchEvent(new CustomEvent('table-sorted', {
+                bubbles: true,
+                detail: {
+                    ids: rows.map(r => r.dataset.recordId),
+                    chronological: !!rows[0]?.cells[i]?.querySelector('[data-sort-timestamp]'),
+                    asc
+                }
+            }));
+        };
+    });
+    function draw() {
+        const n = Math.ceil(rows.length / size);
+        rows.forEach((r, i) => r.hidden = i < page * size || i >= (page + 1) * size);
+        controls.innerHTML = n > 1
+            ? (`<small>${rows.length} registros · página ${page + 1} de ${n}</small>` +
+                `<div class="actions">` +
+                `<button type="button" class="btn small" data-prev ${page === 0 ? 'disabled' : ''}>Anterior</button>` +
+                `<button type="button" class="btn small" data-next ${page === n - 1 ? 'disabled' : ''}>Próxima</button>` +
+                `</div>`)
+            : '';
+        if (n > 1) {
+            $('[data-prev]', controls).onclick = () => {
+                page--;
+                draw();
+            };
+            $('[data-next]', controls).onclick = () => {
+                page++;
+                draw();
+            };
+        }
+    }
+    draw();
+}
+const enhanceUI = () => {
+    document.querySelectorAll('.interactive-chart:not([data-ready])').forEach(c => {
+        c.dataset.ready = '1';
+        enhanceMarks(c);
+    });
+    document.querySelectorAll('.table-wrap:not([data-enhanced])').forEach(enhanceTable);
+};
+new MutationObserver(() => enhanceUI()).observe(document.body, { childList: true, subtree: true });
 /* V4: progressive disclosure for mobile data lists. Desktop tables remain unchanged. */
-function enhanceMobileRows(){document.querySelectorAll('.table-wrap:not([data-mobile-ready])').forEach(w=>{w.dataset.mobileReady='1';if(w.closest('#print-report,#itens'))return;w.querySelectorAll('tbody tr').forEach(r=>{if(r.cells.length<4||r.querySelector('.empty'))return;r.classList.add('compact-record');const b=document.createElement('button');b.type='button';b.className='record-toggle';b.setAttribute('aria-expanded','false');b.setAttribute('aria-label','Mostrar detalhes do registro');b.onclick=()=>{const open=r.classList.toggle('record-open');b.setAttribute('aria-expanded',String(open));b.setAttribute('aria-label',open?'Ocultar detalhes do registro':'Mostrar detalhes do registro');};r.cells[0].append(b);});});}
-new MutationObserver(enhanceMobileRows).observe(document.body,{childList:true,subtree:true});
+// Permite expandir os registros compactos nas telas pequenas.
+function enhanceMobileRows() {
+    document.querySelectorAll('.table-wrap:not([data-mobile-ready])').forEach(w => {
+        w.dataset.mobileReady = '1';
+        if (w.closest('#print-report,#itens'))
+            return;
+        w.querySelectorAll('tbody tr').forEach(r => {
+            if (r.cells.length < 4 || r.querySelector('.empty'))
+                return;
+            r.classList.add('compact-record');
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'record-toggle';
+            b.setAttribute('aria-expanded', 'false');
+            b.setAttribute('aria-label', 'Mostrar detalhes do registro');
+            b.onclick = () => {
+                const open = r.classList.toggle('record-open');
+                b.setAttribute('aria-expanded', String(open));
+                b.setAttribute('aria-label', open ? 'Ocultar detalhes do registro' : 'Mostrar detalhes do registro');
+            };
+            r.cells[0].append(b);
+        });
+    });
+}
+new MutationObserver(enhanceMobileRows).observe(document.body, { childList: true, subtree: true });
+/* V4.2.4 — controle mínimo e ações compactas. */
+const minimoLabel = p => p.monitorarMinimo === false ? 'Não monitorado' : numero(p.minimo);
+const camposMinimo = (p = { monitorarMinimo: true, minimo: 0 }) => (`<label class="row full">` +
+    `<input type="checkbox" name="monitorarMinimo" ${p.monitorarMinimo !== false ? 'checked' : ''}> Monitorar estoque mínimo</label>` +
+    `${field('Estoque mínimo', input('minimo', 'number', `min="0" step="0.001" value="${p.minimo ?? 0}"`))}`);
+// Habilita o campo de quantidade mínima somente quando o monitoramento estiver ativo.
+function bindMinimo(f) {
+    const c = f.elements.monitorarMinimo, m = f.elements.minimo;
+    const sync = () => {
+        m.disabled = !c.checked;
+        m.required = c.checked;
+        m.closest('.field').hidden = !c.checked;
+    };
+    c.addEventListener('change', sync);
+    f.addEventListener('reset', () => queueMicrotask(sync));
+    sync();
+}
+// Gera uma ação principal e um menu compacto para as opções secundárias.
+const acoesRegistro = (principal, secundarias, nome) => (`<div class="record-actions">${principal}${secundarias.length
+    ? (`<button class="btn small record-action-toggle" type="button" aria-label="Mais ações: ${esc(nome)}" aria-expanded="false">⋯</button>` +
+        `<div class="record-action-source" hidden>${secundarias.join('')}</div>`)
+    : ''}` +
+    `</div>`);
+let menuRegistro = null;
+function fecharAcoesRegistro(foco = false) {
+    if (!menuRegistro)
+        return;
+    const { anchor, source, panel } = menuRegistro;
+    menuRegistro = null;
+    while (panel.firstChild)
+        source.append(panel.firstChild);
+    panel.remove();
+    anchor.setAttribute('aria-expanded', 'false');
+    if (foco && anchor.isConnected)
+        anchor.focus();
+}
+// Posiciona o menu de ações dentro da área visível, mesmo em tabelas com rolagem.
+function posicionarAcoesRegistro() {
+    if (!menuRegistro)
+        return;
+    const { anchor, panel } = menuRegistro;
+    if (!anchor.isConnected || !anchor.getClientRects().length || anchor.closest('tr')?.hidden) {
+        fecharAcoesRegistro();
+        return;
+    }
+    const a = anchor.getBoundingClientRect(), margin = 8, v = window.visualViewport, left = v?.offsetLeft || 0, top = v?.offsetTop || 0, w = v?.width || innerWidth, h = v?.height || innerHeight;
+    if (a.bottom < top || a.top > top + h) {
+        fecharAcoesRegistro();
+        return;
+    }
+    panel.style.maxWidth = `${Math.max(0, w - 2 * margin)}px`;
+    const below = top + h - a.bottom - margin, above = a.top - top - margin;
+    const down = below >= Math.min(panel.scrollHeight, 180) || below >= above;
+    panel.style.maxHeight = `${Math.max(44, Math.min(h - 2 * margin, down ? below : above))}px`;
+    const b = panel.getBoundingClientRect();
+    panel.style.left = `${Math.max(left + margin, Math.min(a.right - b.width, left + w - margin - b.width))}px`;
+    panel.style.top = `${Math.max(top + margin, Math.min(down ? a.bottom + 4 : a.top - b.height - 4, top + h - margin - b.height))}px`;
+}
+document.addEventListener('click', e => {
+    const a = e.target.closest('.record-action-toggle');
+    if (a) {
+        const was = menuRegistro?.anchor === a;
+        fecharAcoesRegistro();
+        if (was)
+            return;
+        const source = a.nextElementSibling, panel = document.createElement('div');
+        panel.className = 'record-action-panel';
+        panel.setAttribute('role', 'group');
+        panel.setAttribute('aria-label', a.getAttribute('aria-label'));
+        while (source.firstChild)
+            panel.append(source.firstChild);
+        document.body.append(panel);
+        menuRegistro = { anchor: a, source, panel };
+        a.setAttribute('aria-expanded', 'true');
+        posicionarAcoesRegistro();
+        panel.querySelector('button')?.focus({ preventScroll: true });
+        return;
+    }
+    if (menuRegistro) {
+        if (menuRegistro.panel.contains(e.target) || !menuRegistro.anchor.contains(e.target))
+            fecharAcoesRegistro();
+    }
+});
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && menuRegistro) {
+        e.preventDefault();
+        fecharAcoesRegistro(true);
+    }
+});
+window.addEventListener('resize', posicionarAcoesRegistro);
+window.addEventListener('scroll', posicionarAcoesRegistro, true);
+window.visualViewport?.addEventListener('resize', posicionarAcoesRegistro);
+new MutationObserver(() => {
+    if (menuRegistro && !menuRegistro.anchor.isConnected)
+        fecharAcoesRegistro();
+}).observe(document.body, { childList: true, subtree: true });

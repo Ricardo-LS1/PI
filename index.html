@@ -1,2 +1,92 @@
 <!DOCTYPE html>
-<html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Acesso | O Gato Preto Café</title><link rel="icon" href="assets/logo.svg" type="image/svg+xml"><link rel="stylesheet" href="css/style.css"><link rel="stylesheet" href="css/v4.css"><script defer src="js/dados.js"></script><script defer src="js/global.js"></script><script defer src="js/login.js"></script></head><body class="login"><div class="login-theme"><button type="button" class="btn" data-theme-button aria-label="Alternar modo claro e escuro"></button></div><main class="login-shell"><section class="login-intro"><div class="brand"><img src="assets/logo.svg" alt=""><span><strong>O Gato Preto Café</strong><small>Sistema de gestão</small></span></div><div><p class="eyebrow">PAINEL DO ESTABELECIMENTO</p><h1>Seu café, sob controle.</h1><p>Pedidos, estoque e financeiro em um só lugar. Uma rotina mais organizada, do primeiro café ao fechamento do caixa.</p></div><div class="login-art" aria-hidden="true"><svg viewBox="0 0 380 200"><defs><linearGradient id="cup" x2="1" y2="1"><stop stop-color="#bfe7ff"/><stop offset="1" stop-color="#559edf"/></linearGradient></defs><circle cx="185" cy="100" r="86" fill="#d9f2ff" opacity=".12"/><circle cx="185" cy="100" r="72" fill="none" stroke="#c3e7ff" stroke-opacity=".25"/><path d="M115 82h132v32c0 36-27 58-66 58s-66-22-66-58z" fill="url(#cup)"/><path d="M246 91h16a23 23 0 0 1 0 46h-21" fill="none" stroke="#87caff" stroke-width="12"/><ellipse cx="181" cy="82" rx="66" ry="15" fill="#e4f4ff"/><ellipse cx="181" cy="82" rx="54" ry="10" fill="#28517a"/><path d="M160 59c-16-22 18-24 3-47M186 59c-16-22 18-24 3-47M212 59c-16-22 18-24 3-47" fill="none" stroke="#c2e8ff" stroke-linecap="round" stroke-width="4" opacity=".8"/><path d="M152 116V99l21 13h16l21-13v17c0 17-13 26-29 26s-29-9-29-26z" fill="#17314c"/><circle cx="170" cy="123" r="2.5" fill="#d9f2ff"/><circle cx="192" cy="123" r="2.5" fill="#d9f2ff"/><ellipse cx="182" cy="180" rx="93" ry="6" fill="#9fd7ff" opacity=".5"/><path d="M34 67h40M54 47v40M313 141h26M326 128v26" stroke="#bce7ff" stroke-width="2" stroke-linecap="round" opacity=".55"/></svg></div><div class="features" id="features"></div><small>Projeto Integrador · Análise e Desenvolvimento de Sistemas · V4.1</small></section><section class="login-main"><div><p class="eyebrow">ACESSO INTERNO</p><h2>Bem-vindo ao seu café.</h2><p class="muted">Entre para gerenciar o estabelecimento.</p></div><form id="login-form"><label class="field"><span>Usuário</span><input name="login" autocomplete="username" required placeholder="Seu login"></label><label class="field"><span>Senha</span><span class="password-control"><input type="password" name="senha" autocomplete="current-password" required placeholder="Sua senha"><button type="button" id="show-password" class="btn small" aria-pressed="false">Mostrar</button></span></label><button class="btn primary" type="submit">Entrar no sistema</button><p class="error" id="login-error" role="alert"></p></form><details class="demo-disclosure" open><summary>Acesso de demonstração</summary><div class="demo"><p class="muted"><small>Selecione um perfil para preencher os campos.</small></p><button class="btn" type="button" data-demo="Administrador"><span class="demo-symbol">A</span><span><strong>Administrador</strong><small>admin / admin123 · acesso administrativo</small></span></button><button class="btn" type="button" data-demo="Gerente"><span class="demo-symbol">G</span><span><strong>Gerente</strong><small>gerente / gerente123 · acesso operacional</small></span></button><button class="btn small" id="reset" type="button">Restaurar dados de demonstração</button></div></details><p class="muted login-warning"><small>Protótipo acadêmico. Não informe senhas ou dados reais.</small></p></section></main><noscript>Ative o JavaScript para usar o protótipo.</noscript></body></html>
+<html lang="pt-BR">
+    <head>
+        <!-- Metadados, estilos e scripts carregados na ordem de dependência. -->
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+        <title>Acesso | O Gato Preto Café</title>
+        <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+        <link rel="stylesheet" href="css/style.css?v=4.2.9">
+        <link rel="stylesheet" href="css/v4.css?v=4.2.9">
+        <script defer src="js/dados.js?v=4.2.9"></script>
+        <script defer src="js/global.js?v=4.2.9"></script>
+        <script defer src="js/login.js?v=4.2.9"></script>
+    </head>
+    <body class="login">
+        <div class="login-theme">
+            <button type="button" class="btn" data-theme-button aria-label="Alternar modo claro e escuro"></button>
+        </div>
+        <main class="login-shell">
+            <!-- Identidade visual e apresentação do sistema. -->
+            <section class="login-intro">
+                <div class="brand">
+                    <img src="assets/logo.svg" alt="">
+                    <span><strong>O Gato Preto Café</strong><small>Sistema de gestão</small></span>
+                </div>
+                <div>
+                    <p class="eyebrow">PAINEL DO ESTABELECIMENTO</p>
+                    <h1>Seu café, sob controle.</h1>
+                    <p>Pedidos, estoque e financeiro em um só lugar. Uma rotina mais organizada, do primeiro café ao fechamento do caixa.</p>
+                </div>
+                <div class="login-art" aria-hidden="true">
+                    <svg viewBox="0 0 380 200">
+                        <defs>
+                            <linearGradient id="cup" x2="1" y2="1">
+                                <stop stop-color="#bfe7ff"/>
+                                <stop offset="1" stop-color="#559edf"/>
+                            </linearGradient>
+                        </defs>
+                        <circle cx="185" cy="100" r="86" fill="#d9f2ff" opacity=".12"/>
+                        <circle cx="185" cy="100" r="72" fill="none" stroke="#c3e7ff" stroke-opacity=".25"/>
+                        <path d="M115 82h132v32c0 36-27 58-66 58s-66-22-66-58z" fill="url(#cup)"/>
+                        <path d="M246 91h16a23 23 0 0 1 0 46h-21" fill="none" stroke="#87caff" stroke-width="12"/>
+                        <ellipse cx="181" cy="82" rx="66" ry="15" fill="#e4f4ff"/>
+                        <ellipse cx="181" cy="82" rx="54" ry="10" fill="#28517a"/>
+                        <path d="M160 59c-16-22 18-24 3-47M186 59c-16-22 18-24 3-47M212 59c-16-22 18-24 3-47" fill="none" stroke="#c2e8ff" stroke-linecap="round" stroke-width="4" opacity=".8"/>
+                        <path d="M152 116V99l21 13h16l21-13v17c0 17-13 26-29 26s-29-9-29-26z" fill="#17314c"/>
+                        <circle cx="170" cy="123" r="2.5" fill="#d9f2ff"/>
+                        <circle cx="192" cy="123" r="2.5" fill="#d9f2ff"/>
+                        <ellipse cx="182" cy="180" rx="93" ry="6" fill="#9fd7ff" opacity=".5"/>
+                        <path d="M34 67h40M54 47v40M313 141h26M326 128v26" stroke="#bce7ff" stroke-width="2" stroke-linecap="round" opacity=".55"/>
+                    </svg>
+                </div>
+                <div class="features" id="features"></div>
+                <small>Projeto Integrador · Análise e Desenvolvimento de Sistemas · V4.2.6</small>
+            </section>
+            <!-- Formulário de acesso e perfis fictícios para demonstração. -->
+            <section class="login-main">
+                <div>
+                    <p class="eyebrow">ACESSO INTERNO</p>
+                    <h2>Bem-vindo ao seu café.</h2>
+                    <p class="muted">Entre para gerenciar o estabelecimento.</p>
+                </div>
+                <form id="login-form">
+                    <label class="field">
+                        <span>Usuário</span>
+                        <input name="login" autocomplete="username" required placeholder="Seu login">
+                    </label>
+                    <label class="field">
+                        <span>Senha</span>
+                        <span class="password-control">
+                            <input type="password" name="senha" autocomplete="current-password" required placeholder="Sua senha">
+                            <button type="button" id="show-password" class="btn small" aria-pressed="false">Mostrar</button>
+                        </span>
+                    </label>
+                    <button class="btn primary" type="submit">Entrar no sistema</button>
+                    <p class="error" id="login-error" role="alert"></p>
+                </form>
+                <details class="demo-disclosure" open>
+                    <summary>Acesso de demonstração</summary>
+                    <div class="demo">
+                        <p class="muted"><small>Selecione um perfil para preencher os campos.</small></p>
+                        <button class="btn" type="button" data-demo="Administrador"><span class="demo-symbol">A</span><span><strong>Administrador</strong><small>admin / admin123 · acesso administrativo</small></span></button>
+                        <button class="btn" type="button" data-demo="Gerente"><span class="demo-symbol">G</span><span><strong>Gerente</strong><small>gerente / gerente123 · acesso operacional</small></span></button>
+                        <button class="btn small" id="reset" type="button">Restaurar dados de demonstração</button>
+                    </div>
+                </details>
+                <p class="muted login-warning"><small>Protótipo acadêmico. Não informe senhas ou dados reais.</small></p>
+            </section>
+        </main>
+        <noscript>Ative o JavaScript para usar o protótipo.</noscript>
+    </body>
+</html>
